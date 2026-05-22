@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-cyan: #06b6d4;
+  --color-brand-green: #10b981;
+  --color-brand-orange: #f59e0b;
+}
+
+/* Custom styles for our cryptography network application */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(6, 182, 212, 0.4);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes pulseLightning {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) rotate(3deg);
+  }
+}
+
+@keyframes slowOrbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.mine-button-glowing {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+.lightning-bolt-glowing {
+  animation: pulseLightning 2s infinite ease-in-out;
+}
+
+.orbit-spin-slow {
+  animation: slowOrbit 15s infinite linear;
+}
+
+/* Hide scrollbar utility but keep scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom overlay blur effects representing Immersive dark tech environment */
+.immersive-gradient-bg {
+  background-color: #020208;
+}
+
