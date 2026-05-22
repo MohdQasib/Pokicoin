@@ -4,7 +4,7 @@ export interface MiningTeamMember {
   role: 'Inviter' | 'Invitee' | 'Security'; // Security refers to security circle
   isActive: boolean;
   avatarColor: string;
-  miningContribution: number; // in VMC/hr
+  miningContribution: number; // in POKI/hr
   isSecurityCircle: boolean;
   lastPingTime?: number; // timestamp of last ping
 }

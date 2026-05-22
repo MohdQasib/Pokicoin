@@ -126,12 +126,12 @@ export default function WhitepaperQuiz({
 
   return (
     <div className="flex flex-col h-full bg-transparent font-sans text-white overflow-y-auto no-scrollbar pb-6 p-6">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#020208]/40 backdrop-blur-md z-10">
+      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#0a0802]/40 backdrop-blur-md z-10">
         <div>
-          <h2 className="text-base font-display font-bold text-white uppercase tracking-widest font-sans">Learning & Academy</h2>
+          <h2 className="text-base font-display font-bold text-white uppercase tracking-widest font-sans">Learning Academy</h2>
           <p className="text-[10px] text-white/40 mt-1 uppercase tracking-wide">Read the network whitepaper & pass quorums to boost power</p>
         </div>
-        <BookOpen className="w-5 h-5 text-cyan-400" />
+        <BookOpen className="w-5 h-5 text-amber-500 animate-bounce" />
       </div>
 
       {/* Tabs Selector */}
@@ -141,7 +141,7 @@ export default function WhitepaperQuiz({
           onClick={() => setActiveSegment('whitepaper')}
           className={`flex-1 py-2 px-3 rounded-lg text-[9px] uppercase tracking-wider text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
             activeSegment === 'whitepaper'
-              ? 'bg-cyan-500/15 text-[#67e8f9] border border-cyan-500/20'
+              ? 'bg-amber-500/15 text-[#facc15] border border-amber-500/20'
               : 'text-white/40 hover:text-white/80'
           }`}
         >
@@ -152,13 +152,13 @@ export default function WhitepaperQuiz({
           onClick={() => setActiveSegment('quiz')}
           className={`flex-1 py-2 px-3 rounded-lg text-[9px] uppercase tracking-wider text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
             activeSegment === 'quiz'
-              ? 'bg-cyan-500/15 text-[#67e8f9] border border-cyan-500/20'
+              ? 'bg-amber-500/15 text-[#facc15] border border-amber-500/20'
               : 'text-white/40 hover:text-white/80'
           }`}
         >
           <HelpCircle className="w-3.5 h-3.5" /> Consensus Quiz
           {quizPremiumBooster && (
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
           )}
         </button>
       </div>
@@ -175,7 +175,7 @@ export default function WhitepaperQuiz({
           >
             {/* Whitepaper Section 1 */}
             <div className="bg-white/5 border border-white/10 rounded-xl p-5 select-none leading-relaxed backdrop-blur-sm">
-              <span className="text-[8px] font-mono font-bold text-cyan-400 uppercase tracking-widest block mb-2">Chapter 1.0</span>
+              <span className="text-[8px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-2">Chapter 1.0</span>
               <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2 mb-2">
                 The Smartphone Consensus Paradigm
               </h3>
@@ -187,9 +187,9 @@ export default function WhitepaperQuiz({
               </p>
             </div>
 
-            {/* Whitepaper Section 2 */}
+            {/* Whitepaper Section 3 */}
             <div className="bg-white/5 border border-white/10 rounded-xl p-5 select-none leading-relaxed backdrop-blur-sm">
-              <span className="text-[8px] font-mono font-bold text-cyan-400 uppercase tracking-widest block mb-2">Chapter 2.0</span>
+              <span className="text-[8px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-1">Chapter 2.0</span>
               <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2 mb-2">
                 Stellar Consensus Protocol (SCP)
               </h3>
@@ -197,18 +197,18 @@ export default function WhitepaperQuiz({
                 The network operates using the <strong>Stellar Consensus Protocol (SCP)</strong>. Instead of staking funds or hashing math blocks, agreement on transactional validity is executed by creating <strong>trust slices</strong>.
               </p>
               <p className="text-[11px] text-white/50 mt-2.5 leading-relaxed font-sans">
-                Each member establishes a small network of 3 to 5 trusted friends called a <strong>Security Circle</strong>. This collective network forms a global graph validating transaction parameters. If malicious nodes attempt to introduce fraudulent blocks, the overlap of trusted quorums detects the divergence and rejects the block immediately.
+                Each member establishes a small network of 3 to 5 trusted friends called a <strong>Security Trust Circle</strong>. This collective network forms a global graph validating transaction parameters. If malicious nodes attempt to introduce fraudulent blocks, the overlap of trusted quorums detects the divergence and rejects the block immediately.
               </p>
             </div>
 
-            {/* Whitepaper Section 3 */}
+            {/* Whitepaper Section 4 */}
             <div className="bg-white/5 border border-white/10 rounded-xl p-5 select-none leading-relaxed backdrop-blur-sm">
-              <span className="text-[8px] font-mono font-bold text-cyan-400 uppercase tracking-widest block mb-2">Chapter 3.0</span>
+              <span className="text-[8px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-2">Chapter 3.0</span>
               <h3 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2 mb-2">
                 Token Scarcity and Halvings
               </h3>
               <p className="text-[11px] text-white/50 leading-relaxed font-sans">
-                To reinforce long-term VMC purchasing power, supply generation matches strict geometric <strong>Halving Halos</strong>. When the simulated userbase reaches predetermined metrics (e.g., 100k nodes, 1M nodes), base mining speed is geometrically halved. This ensures that early adopters obtain superior velocity increments while preserving supply caps.
+                To reinforce long-term Poki Koin purchasing power, supply generation matches strict geometric <strong>Halving Halos</strong>. When the simulated userbase reaches predetermined metrics (e.g., 100k nodes, 1M nodes), base mining speed is geometrically halved. This ensures that early adopters obtain superior velocity increments while preserving supply caps.
               </p>
             </div>
 
@@ -228,30 +228,30 @@ export default function WhitepaperQuiz({
                 
                 {correctAnswersCount === QIUZ_DATA.length ? (
                   <>
-                    <div className="w-12 h-12 bg-cyan-950/40 text-cyan-400 border border-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.25)] animate-bounce">
-                      <Award className="w-6 h-6" />
+                    <div className="w-12 h-12 bg-amber-955/40 text-amber-400 border border-amber-500 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.25)] animate-bounce">
+                      <Award className="w-6 h-6 animate-pulse" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold uppercase tracking-widest text-white">Consensus Master 100% Passed</h3>
-                      <p className="text-[11px] text-white/50 mt-1.5 px-4 leading-relaxed font-sans">
-                        You have passed the consensus quiz. An active AI booster has been injected into your speed engine!
+                      <p className="text-[11px] text-white/50 mt-1.5 px-4 leading-relaxed font-sans font-medium text-amber-400">
+                        You have passed the consensus quiz. An active blockchain booster has been injected into your speed engine!
                       </p>
                     </div>
                     
-                    <div className="w-full bg-[#020208]/60 border border-white/10 p-4 rounded-xl text-[9px] font-mono text-cyan-400 flex items-center justify-between">
-                      <span className="flex items-center gap-1"><Zap className="w-4 h-4 fill-cyan-400 text-cyan-400" /> Active Quiz Booster:</span>
-                      <strong className="text-xs">+0.050 VMC/hr</strong>
+                    <div className="w-full bg-[#0a0802] border border-white/10 p-4 rounded-xl text-[9px] font-mono text-amber-400 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Zap className="w-4 h-4 fill-amber-400 text-amber-400" /> Active Quiz Booster:</span>
+                      <strong className="text-xs">+0.050 POKI/hr</strong>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="w-12 h-12 bg-red-950/40 text-red-400 border border-red-500/50 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.15)]">
-                      <XCircle className="w-6 h-6 animate-pulse" />
+                    <div className="w-12 h-12 bg-red-95/40 text-red-400 border border-red-500/50 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.15)]">
+                      <XCircle className="w-6 h-6 animate-ping" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold uppercase tracking-widest text-white">Score: {correctAnswersCount} / {QIUZ_DATA.length}</h3>
                       <p className="text-[11px] text-white/50 mt-1.5 px-4 leading-relaxed font-sans">
-                        An perfect score of {QIUZ_DATA.length} correct answers is required to activate the <strong>+0.05 VMC/hr booster</strong>. Re-evaluate the chapters first.
+                        A perfect score of {QIUZ_DATA.length} correct answers is required to activate the <strong>+0.05 POKI/hr booster</strong>. Re-evaluate the chapters first.
                       </p>
                     </div>
                   </>
@@ -262,7 +262,7 @@ export default function WhitepaperQuiz({
                   onClick={handleResetQuiz}
                   className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1.5 mt-2 transition-colors cursor-pointer"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
                   {correctAnswersCount === QIUZ_DATA.length ? 'Retake Quiz' : 'Try Again'}
                 </button>
               </div>
@@ -275,7 +275,7 @@ export default function WhitepaperQuiz({
                 </div>
 
                 <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                  <div className="h-full bg-cyan-400" style={{ width: `${((currentQuestionIndex + 1) / QIUZ_DATA.length) * 100}%` }} />
+                  <div className="h-full bg-amber-400" style={{ width: `${((currentQuestionIndex + 1) / QIUZ_DATA.length) * 100}%` }} />
                 </div>
 
                 <h4 className="text-[11.5px] font-bold text-white mt-2 leading-relaxed select-none">
@@ -286,23 +286,23 @@ export default function WhitepaperQuiz({
                 <div className="flex flex-col gap-2.5 mt-2">
                   {activeQuestion.options.map((opt, i) => {
                     const isSelected = selectedOption === i;
-                    let optionStyle = 'bg-[#020208]/40 border-white/10 hover:border-white/25 text-white/70';
+                    let optionStyle = 'bg-black/40 border-white/10 hover:border-white/25 text-white/70';
                     let statusIcon = null;
 
                     if (isSelected) {
-                      optionStyle = 'bg-cyan-500/10 border-cyan-500/40 text-[#67e8f9]';
+                      optionStyle = 'bg-amber-500/10 border-amber-500/45 text-amber-300';
                     }
 
                     if (isAnswered) {
                       const isCorrect = i === activeQuestion.correctAnswerIndex;
                       if (isCorrect) {
-                        optionStyle = 'bg-cyan-500/20 border-cyan-500/50 text-[#22d3ee] font-bold';
-                        statusIcon = <CheckCircle className="w-4 h-4 text-cyan-400 shrink-0" />;
+                        optionStyle = 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold';
+                        statusIcon = <CheckCircle className="w-4 h-4 text-amber-400 shrink-0" />;
                       } else if (isSelected) {
                         optionStyle = 'bg-red-500/20 border-red-500/30 text-red-300';
                         statusIcon = <XCircle className="w-4 h-4 text-red-400 shrink-0" />;
                       } else {
-                        optionStyle = 'bg-[#020208]/10 border-transparent text-white/20';
+                        optionStyle = 'bg-black/10 border-transparent text-white/20';
                       }
                     }
 
@@ -313,7 +313,7 @@ export default function WhitepaperQuiz({
                         type="button"
                         onClick={() => handleOptionSelect(i)}
                         disabled={isAnswered}
-                        className={`p-3 rounded-xl border text-left text-xs transition-all leading-relaxed flex items-center justify-between gap-3 cursor-pointer ${optionStyle}`}
+                        className={`p-3 rounded-xl border text-left text-xs transition-colors leading-relaxed flex items-center justify-between gap-3 cursor-pointer ${optionStyle}`}
                       >
                         <span className="font-sans leading-snug">{opt}</span>
                         {statusIcon}
@@ -324,9 +324,9 @@ export default function WhitepaperQuiz({
 
                 {/* Question explanation disclosure */}
                 {showExplanation && (
-                  <div className="bg-[#020208]/60 border border-white/10 rounded-xl p-4 mt-2 text-[10px] leading-relaxed text-white/50">
-                    <strong className="text-[#67e8f9] flex items-center gap-1.5 uppercase tracking-widest font-mono text-[8px] mb-1">
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> Explanation Analysis:
+                  <div className="bg-[#0a0802] border border-white/10 rounded-xl p-4 mt-2 text-[10px] leading-relaxed text-white/50">
+                    <strong className="text-amber-400 flex items-center gap-1.5 uppercase tracking-widest font-mono text-[8.5px] mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Explanation Analysis:
                     </strong>
                     {activeQuestion.explanation}
                   </div>
@@ -338,7 +338,7 @@ export default function WhitepaperQuiz({
                     id="submit-quiz-answer-btn"
                     onClick={handleSubmitAnswer}
                     disabled={selectedOption === null}
-                    className="w-full bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest mt-3 transition-colors cursor-pointer disabled:opacity-40"
+                    className="w-full bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest mt-3 transition-colors cursor-pointer disabled:opacity-45"
                   >
                     Confirm Answer
                   </button>
@@ -346,7 +346,7 @@ export default function WhitepaperQuiz({
                   <button
                     id="next-quiz-question-btn"
                     onClick={handleNextQuestion}
-                    className="w-full bg-gradient-to-tr from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest mt-3 flex items-center justify-center gap-1 cursor-pointer"
+                    className="w-full bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest mt-3 flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <span>{currentQuestionIndex === QIUZ_DATA.length - 1 ? 'Finish Assessment' : 'Next Question'}</span>
                     <ChevronRight className="w-4 h-4" />

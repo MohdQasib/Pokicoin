@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "Represents synchronized user coins, mining velocities, and identity validation credentials",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The unique user identity block hash" },
+        "fullName": { "type": "string", "description": "The human legal full name verified by KYC" },
+        "country": { "type": "string", "description": "Issuing nationality of identification credentials" },
+        "documentType": { "type": "string", "enum": ["passport", "drivers_license", "national_id"] },
+        "documentNumber": { "type": "string", "description": "Unique legal identifier string" },
+        "balance": { "type": "number", "description": "The total synchronized Poki balance" },
+        "transferableBalance": { "type": "number", "description": "Coins from self-hashing loops ready to migrate" },
+        "isMining": { "type": "boolean", "description": "Status representing active consensus validator hashing state" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last block sync" }
+      },
+      "required": ["userId", "balance", "isMining"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Top-level collection for storing synced user states"
+    }
+  }
+}

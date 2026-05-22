@@ -15,7 +15,11 @@ import {
   Activity,
   Cpu,
   Globe,
-  BellRing
+  BellRing,
+  Gamepad2,
+  Trash2,
+  Tv,
+  Coins
 } from 'lucide-react';
 
 import { MiningTeamMember, WalletState, Transaction, Block, KYCDetails, MiningSession } from './types';
@@ -25,14 +29,15 @@ import WalletHub from './components/WalletHub';
 import KycPortal from './components/KycPortal';
 import NetworkExplorer from './components/NetworkExplorer';
 import WhitepaperQuiz from './components/WhitepaperQuiz';
+import GamePortal from './components/GamePortal';
 
 // Default initial network contacts
 const DEFAULT_MEMBERS: MiningTeamMember[] = [
   { id: 'member_alice', name: 'Alice Chen', role: 'Invitee', isActive: true, avatarColor: 'bg-emerald-500 text-emerald-100', miningContribution: 0.005, isSecurityCircle: false },
   { id: 'member_bob', name: 'Bob Sterling', role: 'Invitee', isActive: true, avatarColor: 'bg-indigo-500 text-indigo-100', miningContribution: 0.005, isSecurityCircle: false },
-  { id: 'member_charlie', name: 'Charlie Vance', role: 'Invitee', isActive: false, avatarColor: 'bg-amber-500 text-amber-100', miningContribution: 0.005, isSecurityCircle: false },
-  { id: 'member_dave', name: 'Dave Miller', role: 'Security', isActive: true, avatarColor: 'bg-cyan-500 text-cyan-100', miningContribution: 0.004, isSecurityCircle: true },
-  { id: 'member_eva', name: 'Eva Kovic', role: 'Security', isActive: true, avatarColor: 'bg-purple-500 text-purple-100', miningContribution: 0.004, isSecurityCircle: true }
+  { id: 'member_charlie', name: 'Charlie Vance', role: 'Invitee', isActive: false, avatarColor: 'bg-[#f59e0b] text-[#78350f]', miningContribution: 0.005, isSecurityCircle: false },
+  { id: 'member_dave', name: 'Dave Miller', role: 'Security', isActive: true, avatarColor: 'bg-amber-500 text-amber-955', miningContribution: 0.004, isSecurityCircle: true },
+  { id: 'member_eva', name: 'Eva Kovic', role: 'Security', isActive: true, avatarColor: 'bg-yellow-500 text-[#78350f]', miningContribution: 0.004, isSecurityCircle: true }
 ];
 
 // Helper to generate a mock block hash
@@ -51,8 +56,8 @@ const DEFAULT_BLOCKS: Block[] = [
     sizeKb: 1.45,
     validator: 'Validator Singapore',
     transactions: [
-      { id: 'tx01', sender: 'G324FA238FASDZVM', recipient: 'G821BAS8F12SAZVM', amount: 15.2, fee: 0.0001, timestamp: Date.now() - 18000, blockNumber: 489311, status: 'success' },
-      { id: 'tx02', sender: 'G292S8D22S1XVM', recipient: 'G481BA28F10XVM', amount: 5.0, fee: 0.0001, timestamp: Date.now() - 16000, blockNumber: 489311, status: 'success' }
+      { id: 'tx01', sender: 'G324FA238FASDZPOKI', recipient: 'G821BAS8F12SAZPOKI', amount: 15.2, fee: 0.0001, timestamp: Date.now() - 18000, blockNumber: 489311, status: 'success' },
+      { id: 'tx02', sender: 'G292S8D22S1XPOKI', recipient: 'G481BA28F10XPOKI', amount: 5.0, fee: 0.0001, timestamp: Date.now() - 16000, blockNumber: 489311, status: 'success' }
     ]
   },
   {
@@ -64,16 +69,19 @@ const DEFAULT_BLOCKS: Block[] = [
     sizeKb: 0.85,
     validator: 'Validator Tokyo',
     transactions: [
-      { id: 'tx03', sender: 'G292S8D22S1XVM', recipient: 'G224FA238FASDZVM', amount: 121.4, fee: 0.0001, timestamp: Date.now() - 37000, blockNumber: 489310, status: 'success' }
+      { id: 'tx03', sender: 'G292S8D22S1XPOKI', recipient: 'G224FA238FASDZPOKI', amount: 121.4, fee: 0.0001, timestamp: Date.now() - 37000, blockNumber: 489310, status: 'success' }
     ]
   }
 ];
 
 export default function App() {
-  // Mobile frame tab routing
+  // Top-Level Active Portal Switcher (Portal A vs Portal B)
+  const [activePortal, setActivePortal] = useState<'A' | 'B'>('A');
+
+  // Mobile frame Portal A tab routing
   const [activeTab, setActiveTab] = useState<'mine' | 'team' | 'wallet' | 'kyc' | 'explorer' | 'academy'>('mine');
 
-  // --- STATE DECLARATIONS (with client-side state initialization/local storage fallback) ---
+  // --- STATE DECLARATIONS ---
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('vmc_mining_balance');
     return saved ? parseFloat(saved) : 10.0; // Start with a seed of 10 coins
@@ -98,13 +106,13 @@ export default function App() {
   const [walletState, setWalletState] = useState<WalletState>(() => {
     const saved = localStorage.getItem('vmc_wallet_state');
     return saved ? JSON.parse(saved) : {
-      publicKey: '',
-      privateKeyPhrase: '',
-      isCreated: false,
-      isUnlocked: false,
+      publicKey: 'G_POKI_MAINNET_NODE_772A',
+      privateKeyPhrase: 'poki koin smart algorithm consensus secure phone validator decentral mainnet trust peer',
+      isCreated: true,
+      isUnlocked: true,
       unverifiedBalance: 2.24, // unverified start
       transferableBalance: 7.76, // transferable start
-      migratedBalance: 0.0 // starts with 0 spendable migrated coins
+      migratedBalance: 0.5 // starts with 0.5 migrated
     };
   });
 
@@ -185,13 +193,13 @@ export default function App() {
   const BASE_RATE = 0.02; // constant base
   
   const SECURITY_CIRCLE_RATE = useMemo(() => {
-    // Each security contact adds +0.004 VMC/hr and cap at 5 members max
+    // Each security contact adds +0.004 POKI/hr and cap at 5 members max
     const securityCount = teamMembers.filter(m => m.isSecurityCircle).length;
     return Math.min(5, securityCount) * 0.004;
   }, [teamMembers]);
 
   const REFERRAL_RATE = useMemo(() => {
-    // Each referral contact who is active adds +0.005 VMC/hr
+    // Each referral contact who is active adds +0.005 POKI/hr
     const activeRef = teamMembers.filter(m => !m.isSecurityCircle && m.isActive).length;
     return activeRef * 0.005;
   }, [teamMembers]);
@@ -334,7 +342,7 @@ export default function App() {
       'bg-emerald-500 text-emerald-100',
       'bg-indigo-500 text-indigo-100',
       'bg-pink-500 text-pink-100',
-      'bg-cyan-500 text-cyan-100',
+      'bg-amber-500 text-amber-955',
       'bg-teal-500 text-teal-100',
       'bg-purple-500 text-purple-100',
       'bg-orange-500 text-orange-100'
@@ -397,7 +405,7 @@ export default function App() {
       return { success: false, error: 'Insufficient migrated ledger balance.' };
     }
 
-    const txId = 'tx_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+    const txId = 'tx_' + Math.random().toString(36).substring(2, 10);
     const newTx: Transaction = {
       id: txId,
       sender: walletState.publicKey,
@@ -481,14 +489,23 @@ export default function App() {
     }
   };
 
+  const handleGameRewardAwarded = (amount: number) => {
+    // Add rewards from gaming immediately to the central state (sync in real time!)
+    setBalance(prev => prev + amount);
+    setWalletState(prev => ({
+      ...prev,
+      transferableBalance: prev.transferableBalance + amount
+    }));
+  };
+
   return (
-    <div className="min-h-screen bg-[#020208] text-white font-sans flex flex-col xl:flex-row antialiased overflow-x-hidden relative">
+    <div className="min-h-screen bg-[#080602] text-white font-sans flex flex-col xl:flex-row antialiased overflow-x-hidden relative">
       
-      {/* Background ambient radial blur lights matching Immersive UI Design */}
+      {/* Background ambient radial blur lights matching Immersive UI Design - Warm Gold Glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-900/15 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-purple-900/15 rounded-full blur-[150px]"></div>
-        <div className="absolute top-[40%] left-[30%] w-[35%] h-[35%] bg-cyan-950/10 rounded-full blur-[110px]"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-amber-950/20 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-yellow-950/15 rounded-full blur-[150px]"></div>
+        <div className="absolute top-[40%] left-[30%] w-[35%] h-[35%] bg-amber-900/10 rounded-full blur-[110px]"></div>
       </div>
 
       {/* LEFT SIDEBAR: Broad decentralized telemetry dashboard metrics (Desktop-Only Panel) */}
@@ -497,50 +514,50 @@ export default function App() {
         {/* Title / Brand Header */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-500/25">
-              <Sparkles className="w-5 h-5 text-white animate-pulse" />
+            <div className="w-10 h-10 bg-gradient-to-tr from-amber-500 to-yellow-500 rounded-lg flex items-center justify-center shadow-lg shadow-amber-500/25">
+              <Sparkles className="w-5 h-5 text-black animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl font-display font-bold tracking-widest text-[#f5fbfd] select-none">
-                VMC<span className="text-cyan-400">NET</span>
+              <h1 className="text-xl font-display font-medium tracking-widest text-[#f5fbfd] select-none">
+                POKI<span className="text-amber-400 font-bold">NET</span>
               </h1>
-              <p className="text-[10px] text-white/50 tracking-[0.2em] font-mono uppercase">Decentralized Stellar consensus</p>
+              <p className="text-[10px] text-amber-500/80 tracking-[0.2em] font-mono uppercase font-bold">minipocicoin.in • CONSENSUS</p>
             </div>
           </div>
-          <p className="text-xs text-white/40 max-w-sm mt-4 leading-relaxed border-l border-white/20 pl-3">
-            Simulates real-time consensus protocol parameters inside your browser, showing network logs, mobile cryptographic distribution, and peer identity audits.
+          <p className="text-xs text-white/55 max-w-sm mt-4 leading-relaxed border-l border-amber-400/30 pl-3">
+            Real-time smartphone mining protocol and game rewards simulator. Earn and swap synchronized <strong>Poki Koins</strong> dynamically through high-fidelity quorums.
           </p>
         </div>
 
         {/* Central telemetry logs info */}
         <div className="flex flex-col gap-6 my-6">
           
-          <h3 className="text-[10px] text-cyan-400 font-bold uppercase tracking-[0.3em] leading-none">Node Telemetry Indices</h3>
+          <h3 className="text-[10px] text-amber-400 font-bold uppercase tracking-[0.3em] leading-none">Console Telemetry Indices</h3>
           
           <div className="grid grid-cols-2 gap-4">
             
             {/* Height Indicator */}
             <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="absolute right-0 top-0 w-16 h-16 bg-blue-500/5 rounded-full blur-md"></div>
+              <div className="absolute right-0 top-0 w-16 h-16 bg-amber-500/5 rounded-full blur-md"></div>
               <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">Consensus Height</span>
-                <Layers className="w-4 h-4 text-cyan-400" />
+                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">Ledger Height</span>
+                <Layers className="w-4 h-4 text-amber-400" />
               </div>
               <p className="text-2xl font-light font-display mt-2 text-white">#{blocks[0].number}</p>
-              <span className="text-[8.5px] font-mono text-cyan-400 flex items-center gap-1 mt-1.5">
-                • Active core validated ok
+              <span className="text-[8.5px] font-mono text-amber-400 flex items-center gap-1 mt-1.5">
+                • Sync validated OK
               </span>
             </div>
 
             {/* Mining Velocity */}
             <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="absolute right-0 top-0 w-16 h-16 bg-cyan-500/5 rounded-full blur-md"></div>
+              <div className="absolute right-0 top-0 w-16 h-16 bg-yellow-500/5 rounded-full blur-md"></div>
               <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider font-sans">Local Node Speed</span>
-                <Zap className="w-4 h-4 text-cyan-400 animate-pulse" />
+                <span className="text-[9px] font-bold font-mono uppercase tracking-wider font-sans">Node Velocity</span>
+                <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
               </div>
               <p className="text-2xl font-light font-display mt-2 text-white">+{TOTAL_MINING_RATE.toFixed(4)} <span className="text-xs text-white/40 font-mono">/hr</span></p>
-              <span className={`text-[8.5px] font-mono flex items-center gap-1 mt-1.5 ${isMining ? 'text-cyan-400' : 'text-white/40'}`}>
+              <span className={`text-[8.5px] font-mono flex items-center gap-1 mt-1.5 ${isMining ? 'text-amber-400 font-bold' : 'text-white/40'}`}>
                 {isMining ? '⚡ Core actively hashing' : '💤 Core simulation idle'}
               </span>
             </div>
@@ -549,30 +566,30 @@ export default function App() {
             <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
               <div className="flex items-center justify-between text-white/40">
                 <span className="text-[9px] font-bold font-mono uppercase tracking-wider">Global Validators</span>
-                <Globe className="w-4 h-4 text-cyan-400" />
+                <Globe className="w-4 h-4 text-amber-400" />
               </div>
-              <p className="text-2xl font-light font-display mt-2 text-white">128<span className="text-xs text-white/30">/128</span></p>
-              <span className="text-[8.5px] font-mono text-cyan-400/80 flex items-center gap-1 mt-1.5">
-                • Threshold quorum stable
+              <p className="text-2xl font-light font-display mt-2 text-white">512<span className="text-xs text-white/30">/512</span></p>
+              <span className="text-[8.5px] font-mono text-amber-400/80 flex items-center gap-1 mt-1.5">
+                • Quorum threshold stable
               </span>
             </div>
 
             {/* KYC status details */}
             <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
               <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">KYC Audit Lock</span>
-                <Cpu className="w-4 h-4 text-cyan-400" />
+                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">KYC Audit State</span>
+                <Cpu className="w-4 h-4 text-amber-400" />
               </div>
-              <p className={`text-base font-bold font-display mt-2.5 uppercase tracking-widest ${
+              <p className={`text-sm font-bold font-display mt-2.5 uppercase tracking-widest ${
                 kycDetails.status === 'approved' 
-                  ? 'text-cyan-400' 
+                  ? 'text-amber-400 font-black' 
                   : kycDetails.status === 'verifying' 
-                  ? 'text-amber-500 animate-pulse' 
+                  ? 'text-yellow-500 animate-pulse font-bold' 
                   : 'text-white/40'
               }`}>
-                {kycDetails.status === 'approved' ? 'VERIFIED HUMAN' : kycDetails.status === 'verifying' ? 'AUDITING...' : 'REQUIRED'}
+                {kycDetails.status === 'approved' ? 'VALIDATED' : kycDetails.status === 'verifying' ? 'AUDITING...' : 'REQUIRED'}
               </p>
-              <span className="text-[8.5px] font-mono text-white/30 flex items-center gap-1 mt-1.5">
+              <span className="text-[8.5px] font-mono text-white/30 flex items-center gap-1 mt-1.5 font-sans">
                 Prevents bot farms
               </span>
             </div>
@@ -581,17 +598,17 @@ export default function App() {
 
           {/* Halving progress bar */}
           <div className="bg-white/[0.03] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-inner flex flex-col gap-2.5">
-            <div className="flex justify-between text-[9px] text-[#06b6d4] font-bold font-mono uppercase tracking-widest">
-              <span>Next Halving Pool Status</span>
-              <span>78% FILLED</span>
+            <div className="flex justify-between text-[9px] text-[#facc15] font-bold font-mono uppercase tracking-widest">
+              <span>Next Core Halving Pool</span>
+              <span>85% FILLED</span>
             </div>
             
             <div className="relative w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/10">
-              <div className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500" style={{ width: '78%' }}></div>
+              <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400" style={{ width: '85%' }}></div>
             </div>
 
             <div className="flex justify-between text-[8px] text-white/30 font-mono uppercase tracking-wide">
-              <span>Rate: {TOTAL_MINING_RATE.toFixed(4)} VMC/hr</span>
+              <span>Rate: {TOTAL_MINING_RATE.toFixed(4)} POKI/hr</span>
               <span>Target: {(TOTAL_MINING_RATE / 2).toFixed(4)} (Post Halving)</span>
             </div>
           </div>
@@ -601,13 +618,13 @@ export default function App() {
         {/* Action resets */}
         <div className="flex justify-between items-center bg-white/[0.02] p-4 rounded-xl border border-white/10">
           <div className="text-[9px] text-white/30 font-mono uppercase tracking-wider">
-            <p className="text-white/40 font-bold">VMC Consensus v1.4.0</p>
-            <p className="mt-0.5">PI STELLAR MECHANICS MOCK</p>
+            <p className="text-white/40 font-bold">Poki Core Sync v2.1.0</p>
+            <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR EXCHANGE</p>
           </div>
           <button
-            id="clear-persistence-btn"
+            id="clear-persistence-desktop-btn"
             onClick={handleClearPersistence}
-            className="text-[9px] font-bold tracking-widest font-mono bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 px-3 py-1.5 rounded-lg cursor-pointer transition-colors uppercase"
+            className="text-[9px] font-semibold tracking-widest font-mono bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 px-3 py-1.5 rounded-lg cursor-pointer transition-colors uppercase"
           >
             Clear State
           </button>
@@ -616,11 +633,40 @@ export default function App() {
       </div>
 
 
-      {/* RIGHT PANEL: High-Fidelity curved smartphone frame hosting the mobile miner application */}
-      <div className="flex-1 flex justify-center items-center p-4 sm:p-6 md:p-8 relative z-10">
+      {/* RIGHT PANEL: High-Fidelity smartphone frame hosting the dual-portal app */}
+      <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 md:p-8 relative z-10 w-full max-w-xl mx-auto">
         
+        {/* PORTAL SELECTOR: Beautiful premium pills allowing instant transfer between Portal A and Portal B */}
+        <div className="w-full max-w-sm flex bg-black/60 border border-white/10 rounded-2xl p-1 mb-5 relative z-10 backdrop-blur-xl shadow-lg">
+          <button
+            id="portal-a-select"
+            onClick={() => setActivePortal('A')}
+            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activePortal === 'A'
+                ? 'bg-gradient-to-tr from-amber-500 to-yellow-500 text-black shadow-md font-extrabold'
+                : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            <Smartphone className="w-4 h-4" />
+            Portal A: Miner
+          </button>
+          
+          <button
+            id="portal-b-select"
+            onClick={() => setActivePortal('B')}
+            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activePortal === 'B'
+                ? 'bg-gradient-to-tr from-amber-500 to-yellow-500 text-black shadow-md font-extrabold'
+                : 'text-white/40 hover:text-white/70'
+            }`}
+          >
+            <Gamepad2 className="w-4 h-4" />
+            Portal B: Arcade
+          </button>
+        </div>
+
         {/* Curvaceous Smartphone container markup */}
-        <div className="w-full max-w-sm h-[740px] rounded-[48px] bg-[#020208]/92 border-[8px] border-white/10 shadow-[0_25px_60px_rgba(0,0,0,0.85)] relative flex flex-col overflow-hidden ring-1 ring-white/15 backdrop-blur-xl">
+        <div className="w-full max-w-sm h-[740px] rounded-[48px] bg-black/90 border-[8px] border-white/10 shadow-[0_25px_60px_rgba(245,158,11,0.05)] relative flex flex-col overflow-hidden ring-1 ring-white/15 backdrop-blur-xl">
           
           {/* Top Notch speaker and camera bar mock */}
           <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-white/10 rounded-b-2xl z-50 flex items-center justify-center pointer-events-none">
@@ -632,193 +678,181 @@ export default function App() {
           <div className="flex-1 flex flex-col h-full pt-6 relative bg-transparent">
             
             <AnimatePresence mode="wait">
-              {activeTab === 'mine' && (
-                <motion.div 
-                  key="mine-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
+              {activePortal === 'A' ? (
+                /* PORTAL A: CORE MINING APP WITH INTERNAL NAVIGATION */
+                <motion.div
+                  key="portal-a"
+                  initial={{ opacity: 0, x: -15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 15 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 flex flex-col overflow-hidden"
                 >
-                  <MiningHub
+                  <div className="flex-1 overflow-hidden h-full">
+                    {activeTab === 'mine' && (
+                      <MiningHub
+                        balance={balance}
+                        miningRate={TOTAL_MINING_RATE}
+                        isMining={isMining}
+                        onStartMining={handleStartMining}
+                        timeLeftMs={timeLeftMs}
+                        teamMembers={teamMembers}
+                        quizPremiumBooster={quizPremiumBooster}
+                        baseRate={BASE_RATE}
+                        securityCircleRate={SECURITY_CIRCLE_RATE}
+                        referralRate={REFERRAL_RATE}
+                        quizRate={QUIZ_RATE}
+                        onRewardAwarded={handleGameRewardAwarded}
+                      />
+                    )}
+
+                    {activeTab === 'team' && (
+                      <TeamManager
+                        teamMembers={teamMembers}
+                        onAddMember={handleAddMember}
+                        onRemoveMember={handleRemoveMember}
+                        onPingMember={handlePingMember}
+                      />
+                    )}
+
+                    {activeTab === 'wallet' && (
+                      <WalletHub
+                        walletState={walletState}
+                        onWalletCreate={handleWalletCreate}
+                        onWalletUnlock={handleWalletUnlock}
+                        onWalletLock={handleWalletLock}
+                        onSendTransaction={handleSendTransaction}
+                        onMigrateBalance={handleMigrateBalance}
+                        kycApproved={kycDetails.status === 'approved'}
+                        transactions={transactions}
+                        teamMembers={teamMembers}
+                        balance={balance}
+                      />
+                    )}
+
+                    {activeTab === 'kyc' && (
+                      <KycPortal
+                        kycDetails={kycDetails}
+                        onKycSubmit={handleKycSubmit}
+                        onKycApprove={handleKycApprove}
+                      />
+                    )}
+
+                    {activeTab === 'explorer' && (
+                      <NetworkExplorer
+                        blocks={blocks}
+                        activeBlockHeight={blocks[0].number}
+                      />
+                    )}
+
+                    {activeTab === 'academy' && (
+                      <WhitepaperQuiz
+                        quizPremiumBooster={quizPremiumBooster}
+                        onUnlockQuizBooster={handleUnlockQuizBooster}
+                      />
+                    )}
+                  </div>
+
+                  {/* Bottom persistent smartphone navigation dock */}
+                  <div className="bg-[#0a0802] border-t border-white/10 py-3.5 px-1 flex justify-between items-center shrink-0 backdrop-blur-md relative z-10 select-none">
+                    
+                    {/* Mine Tab Button */}
+                    <button
+                      id="dock-tab-mine"
+                      onClick={() => setActiveTab('mine')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'mine' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <Zap className={`w-4 h-4 ${activeTab === 'mine' && isMining ? 'text-amber-400 fill-amber-400/20 animate-pulse' : ''}`} />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">Mining</span>
+                    </button>
+
+                    {/* Team Tab Button */}
+                    <button
+                      id="dock-tab-team"
+                      onClick={() => setActiveTab('team')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'team' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">Team</span>
+                    </button>
+
+                    {/* Wallet Tab Button */}
+                    <button
+                      id="dock-tab-wallet"
+                      onClick={() => setActiveTab('wallet')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'wallet' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <Key className="w-4 h-4" />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">Wallet</span>
+                    </button>
+
+                    {/* KYC Tab Button */}
+                    <button
+                      id="dock-tab-kyc"
+                      onClick={() => setActiveTab('kyc')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'kyc' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">KYC</span>
+                    </button>
+
+                    {/* Explorer Tab Button */}
+                    <button
+                      id="dock-tab-explorer"
+                      onClick={() => setActiveTab('explorer')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'explorer' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <Database className="w-4 h-4" />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">Ledger</span>
+                    </button>
+
+                    {/* Academy Tab Button */}
+                    <button
+                      id="dock-tab-academy"
+                      onClick={() => setActiveTab('academy')}
+                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
+                        activeTab === 'academy' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+                      }`}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span className="text-[8px] font-bold tracking-wider uppercase">Specs</span>
+                    </button>
+
+                  </div>
+                </motion.div>
+              ) : (
+                /* PORTAL B: INTEGRATED HIGH RESILIENCE GAME PORTAL */
+                <motion.div
+                  key="portal-b"
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex-1 flex flex-col overflow-hidden h-full"
+                >
+                  <GamePortal
                     balance={balance}
-                    miningRate={TOTAL_MINING_RATE}
-                    isMining={isMining}
-                    onStartMining={handleStartMining}
-                    timeLeftMs={timeLeftMs}
-                    teamMembers={teamMembers}
-                    quizPremiumBooster={quizPremiumBooster}
-                    baseRate={BASE_RATE}
-                    securityCircleRate={SECURITY_CIRCLE_RATE}
-                    referralRate={REFERRAL_RATE}
-                    quizRate={QUIZ_RATE}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === 'team' && (
-                <motion.div 
-                  key="team-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <TeamManager
-                    teamMembers={teamMembers}
-                    onAddMember={handleAddMember}
-                    onRemoveMember={handleRemoveMember}
-                    onPingMember={handlePingMember}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === 'wallet' && (
-                <motion.div 
-                  key="wallet-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <WalletHub
                     walletState={walletState}
-                    onWalletCreate={handleWalletCreate}
-                    onWalletUnlock={handleWalletUnlock}
-                    onWalletLock={handleWalletLock}
-                    onSendTransaction={handleSendTransaction}
-                    onMigrateBalance={handleMigrateBalance}
-                    kycApproved={kycDetails.status === 'approved'}
-                    transactions={transactions}
-                    teamMembers={teamMembers}
-                    balance={balance}
+                    onRewardAwarded={handleGameRewardAwarded}
                   />
-                </motion.div>
-              )}
-
-              {activeTab === 'kyc' && (
-                <motion.div 
-                  key="kyc-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <KycPortal
-                    kycDetails={kycDetails}
-                    onKycSubmit={handleKycSubmit}
-                    onKycApprove={handleKycApprove}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === 'explorer' && (
-                <motion.div 
-                  key="explorer-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <NetworkExplorer
-                    blocks={blocks}
-                    activeBlockHeight={blocks[0].number}
-                  />
-                </motion.div>
-              )}
-
-              {activeTab === 'academy' && (
-                <motion.div 
-                  key="academy-tab" 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="flex-1 overflow-hidden"
-                >
-                  <WhitepaperQuiz
-                    quizPremiumBooster={quizPremiumBooster}
-                    onUnlockQuizBooster={handleUnlockQuizBooster}
-                  />
+                  
+                  {/* Subtle navigation note */}
+                  <div className="bg-[#0a0802] border-t border-white/5 py-3 text-center text-[9px] text-[#facc15]/65 uppercase tracking-widest shrink-0 font-medium font-sans">
+                    🔀 Use top toggle to return to Mining Hub
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Bottom persistent smartphone navigation dock */}
-            <div className="bg-[#020208]/85 border-t border-white/10 py-3.5 px-2 flex justify-between items-center shrink-0 backdrop-blur-md relative z-10">
-              
-              {/* Mine Tab Button */}
-              <button
-                id="dock-tab-mine"
-                onClick={() => setActiveTab('mine')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'mine' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <Zap className={`w-4.5 h-4.5 ${activeTab === 'mine' && isMining ? 'text-cyan-400 fill-cyan-400/20 animate-pulse' : ''}`} />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">Mining</span>
-              </button>
-
-              {/* Team Tab Button */}
-              <button
-                id="dock-tab-team"
-                onClick={() => setActiveTab('team')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'team' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <Users className="w-4.5 h-4.5" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">Team</span>
-              </button>
-
-              {/* Wallet Tab Button */}
-              <button
-                id="dock-tab-wallet"
-                onClick={() => setActiveTab('wallet')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'wallet' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <Key className="w-4.5 h-4.5" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">Wallet</span>
-              </button>
-
-              {/* KYC Tab Button */}
-              <button
-                id="dock-tab-kyc"
-                onClick={() => setActiveTab('kyc')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'kyc' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <ShieldCheck className="w-4.5 h-4.5" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">KYC</span>
-              </button>
-
-              {/* Explorer Tab Button */}
-              <button
-                id="dock-tab-explorer"
-                onClick={() => setActiveTab('explorer')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'explorer' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <Database className="w-4.5 h-4.5" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">Ledger</span>
-              </button>
-
-              {/* Academy Tab Button */}
-              <button
-                id="dock-tab-academy"
-                onClick={() => setActiveTab('academy')}
-                className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                  activeTab === 'academy' ? 'text-cyan-400' : 'text-white/40 hover:text-white/80'
-                }`}
-              >
-                <BookOpen className="w-4.5 h-4.5" />
-                <span className="text-[9px] font-semibold tracking-wider uppercase">Tech</span>
-              </button>
-
-            </div>
 
           </div>
 

@@ -56,33 +56,35 @@ export default function NetworkExplorer({
     <div className="flex flex-col h-full bg-transparent font-sans text-white overflow-y-auto no-scrollbar pb-6 p-6">
       
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#020208]/40 backdrop-blur-md z-10">
+      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#0a0802]/40 backdrop-blur-md z-10">
         <div>
-          <h2 className="text-base font-display font-bold text-white uppercase tracking-widest font-sans">Simulated Block Ledger</h2>
-          <p className="text-[10px] text-white/40 mt-1 uppercase tracking-wide">Stellar Consensus Protocol (SCP) mesh node observer</p>
+          <h2 className="text-base font-display font-bold text-white uppercase tracking-widest">Poki Block Explorer</h2>
+          <p className="text-[10px] text-white/40 mt-1 uppercase tracking-wide">Decentralized stellar ledger peer validator</p>
         </div>
-        <Network className="w-5 h-5 text-cyan-400" />
+        <Network className="w-5 h-5 text-amber-400 animate-pulse" />
       </div>
 
       {/* Network Stats Bento Panels */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col justify-between backdrop-blur-sm">
           <span className="text-[8px] text-white/40 uppercase tracking-widest font-semibold font-mono flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5 text-cyan-400" /> Height
+            <Layers className="w-3.5 h-3.5 text-amber-400" /> Height
           </span>
-          <span className="text-sm font-bold font-mono text-[#67e8f9] mt-1">#{activeBlockHeight}</span>
+          <span className="text-sm font-bold font-mono text-amber-500 mt-1">#{activeBlockHeight}</span>
         </div>
+        
         <div className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col justify-between backdrop-blur-sm">
           <span className="text-[8px] text-white/40 uppercase tracking-widest font-semibold font-mono flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" /> Ledger Tx
+            <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> Ledger Tx
           </span>
-          <span className="text-sm font-bold font-mono text-cyan-300 mt-1">{totalTransactionsCount}</span>
+          <span className="text-sm font-bold font-mono text-amber-300 mt-1">{totalTransactionsCount}</span>
         </div>
+        
         <div className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col justify-between backdrop-blur-sm">
-          <span className="text-[8px] text-white/40 uppercase tracking-widest font-semibold font-mono flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-[#22d3ee]" /> Interval
+          <span className="text-[8px] text-white/40 uppercase tracking-widest font-semibold font-mono flex items-center gap-1 flex-row">
+            <Clock className="w-3.5 h-3.5 text-amber-400" /> Interval
           </span>
-          <span className="text-sm font-bold font-mono text-cyan-100 mt-1">~5.2s</span>
+          <span className="text-sm font-bold font-mono text-amber-100 mt-1">~5.2s</span>
         </div>
       </div>
 
@@ -90,22 +92,22 @@ export default function NetworkExplorer({
       <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-6 flex flex-col gap-4 backdrop-blur-sm">
         <div className="flex justify-between items-center px-1">
           <h3 className="text-[9px] font-bold uppercase tracking-widest text-white/50 flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-cyan-400" /> Consensus Mesh Coordinates
+            <Database className="w-3.5 h-3.5 text-amber-400" /> Consensus Mesh Nodes
           </h3>
-          <span className="text-[8px] bg-cyan-950/20 px-2 py-0.5 border border-cyan-500/20 text-[#67e8f9] font-mono rounded">
-            Decentralized Nodes
+          <span className="text-[8px] bg-amber-950/20 px-2 py-0.5 border border-amber-500/20 text-amber-400 font-mono rounded">
+            Decentralized Mesh
           </span>
         </div>
 
         {/* Vector SVG World map simulator with nodes connecting */}
-        <div className="w-full h-44 bg-[#020208]/60 border border-white/10 rounded-xl relative overflow-hidden flex items-center justify-center">
+        <div className="w-full h-44 bg-black/60 border border-white/10 rounded-xl relative overflow-hidden flex items-center justify-center">
           <svg className="w-full h-full" viewBox="0 0 540 280">
             {/* Soft grid lines */}
             <path d="M0,70 L540,70 M0,140 L540,140 M0,210 L540,210 M135,0 L135,280 M270,0 L270,280 M405,0 L405,280" stroke="rgba(255,255,255,0.02)" strokeWidth="1" />
             
             {/* Simulated background continent paths */}
-            <path d="M80,80 Q100,50 140,40 T220,60 T250,90 T260,150 T200,210 T140,240 T80,180 Z" fill="rgba(6,182,212,0.02)" fillOpacity="0.05" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
-            <path d="M350,50 Q410,40 450,70 T480,120 T520,180 T460,240 T380,210 T330,130 Z" fill="rgba(6,182,212,0.02)" fillOpacity="0.05" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+            <path d="M80,80 Q100,50 140,40 T220,60 T250,90 T260,150 T200,210 T140,240 T80,180 Z" fill="rgba(245,158,11,0.02)" fillOpacity="0.05" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+            <path d="M350,50 Q410,40 450,70 T480,120 T520,180 T460,240 T380,210 T330,130 Z" fill="rgba(245,158,11,0.02)" fillOpacity="0.05" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
             
             {/* Packet vectors animation lines */}
             {MOCK_MAP_NODES.map((node, i) => {
@@ -116,7 +118,7 @@ export default function NetworkExplorer({
                   <line 
                     x1={node.x} y1={node.y} 
                     x2={nextNode.x} y2={nextNode.y} 
-                    stroke="rgba(6,182,212,0.05)" 
+                    stroke="rgba(245,158,11,0.05)" 
                     strokeWidth="1.5" 
                   />
                   {/* Glowing dynamic packet pulsing */}
@@ -125,7 +127,7 @@ export default function NetworkExplorer({
                     cx={node.x}
                     cy={node.y}
                     r="2"
-                    fill="#06b6d4"
+                    fill="#f59e0b"
                     animate={{
                       cx: [node.x, nextNode.x],
                       cy: [node.y, nextNode.y],
@@ -153,16 +155,16 @@ export default function NetworkExplorer({
                   <circle 
                     cx={node.x} cy={node.y} 
                     r={isActive ? "9" : "4"} 
-                    fill="#06b6d4" 
+                    fill="#f59e0b" 
                     fillOpacity={isActive ? "0.2" : "0.1"} 
-                    stroke={isActive ? "#22d3ee" : "#06b6d4"} 
+                    stroke={isActive ? "#facc15" : "#f59e0b"} 
                     strokeWidth={isActive ? "1.5" : "1"}
                     className="transition-all duration-300"
                   />
                   <circle 
                     cx={node.x} cy={node.y} 
                     r="2" 
-                    fill={isActive ? "#22d3ee" : "#06b6d4"} 
+                    fill={isActive ? "#facc15" : "#f59e0b"} 
                   />
                 </g>
               );
@@ -170,17 +172,17 @@ export default function NetworkExplorer({
           </svg>
 
           {/* Floater overlay displaying Node info */}
-          <div className="absolute bottom-3 left-3 bg-[#020208]/90 border border-white/10 text-[9px] p-2.5 rounded-xl flex flex-col gap-1 backdrop-blur-md shadow-lg">
+          <div className="absolute bottom-3 left-3 bg-[#0a0802]/90 border border-white/10 text-[9px] p-2.5 rounded-xl flex flex-col gap-1 backdrop-blur-md shadow-lg">
             {selectedNode ? (
               <>
                 <p className="font-bold text-white/90 flex items-center gap-1.5 leading-none">
-                  <MapPin className="w-3 h-3 text-cyan-400" />
+                  <MapPin className="w-3 h-3 text-amber-400" />
                   {selectedNode.name}
                 </p>
                 <div className="flex gap-4 text-white/50 font-mono text-[8px] mt-1 pr-1">
-                  <span>Latency: <strong className="text-cyan-400">{selectedNode.ping}ms</strong></span>
+                  <span>Latency: <strong className="text-amber-400">{selectedNode.ping}ms</strong></span>
                   <span>IP: <strong className="text-white/70">{selectedNode.ip}</strong></span>
-                  <span>CPU: <strong className="text-cyan-300">{selectedNode.cpu}%</strong></span>
+                  <span>CPU: <strong className="text-amber-300">{selectedNode.cpu}%</strong></span>
                 </div>
               </>
             ) : (
@@ -191,10 +193,10 @@ export default function NetworkExplorer({
       </div>
 
       {/* Main Ledger Blocks Columns */}
-      <div className="flex flex-col gap-4 relative z-10">
-        <h3 className="text-[10px] font-bold text-white/50 uppercase tracking-widest flex items-center justify-between leading-none">
-          <span>Simulation Ledger Ledger Logs</span>
-          <span className="text-[8px] lowercase text-white/30 font-normal">Updated in real-time</span>
+      <div className="flex flex-col gap-4 relative z-10 col-span-2">
+        <h3 className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-3 flex items-center justify-between leading-none">
+          <span>Simulation Ledger Log Stream</span>
+          <span className="text-[8px] text-white/30 font-normal font-sans">Synced minipocicoin.in</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -207,13 +209,13 @@ export default function NetworkExplorer({
                 onClick={() => setSelectedBlock(block)}
                 className={`p-3 rounded-xl border transition-all cursor-pointer flex justify-between items-center ${
                   selectedBlock?.number === block.number 
-                    ? 'bg-white/15 border-cyan-500/30 shadow-md' 
+                    ? 'bg-white/15 border-amber-500/30 shadow-md' 
                     : 'bg-white/[0.02] border-white/10 hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="bg-[#020208]/40 p-2 border border-white/10 text-white/40 rounded-xl">
-                    <Database className="w-4 h-4 text-cyan-400" />
+                  <div className="bg-[#0a0802] p-2 border border-white/10 text-white/40 rounded-xl">
+                    <Database className="w-4 h-4 text-amber-400" />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold font-mono text-white/90">Block #{block.number}</h4>
@@ -224,7 +226,7 @@ export default function NetworkExplorer({
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[8px] font-mono text-[#67e8f9] bg-cyan-500/10 py-0.5 px-1.5 rounded border border-cyan-500/20 uppercase tracking-wide">
+                  <span className="text-[8px] font-mono text-amber-400 bg-amber-500/10 py-0.5 px-1.5 rounded border border-amber-500/20 uppercase tracking-wide">
                     {block.transactionCount} Tx
                   </span>
                   <span className="text-[8px] text-white/30 font-mono block mt-1">
@@ -242,17 +244,17 @@ export default function NetworkExplorer({
                 {/* Block general details */}
                 <div className="border-b border-white/10 pb-3">
                   <div className="flex justify-between items-start">
-                    <h4 className="text-[10px] font-bold font-mono text-cyan-400 uppercase tracking-widest">Metadata Block #{selectedBlock.number}</h4>
+                    <h4 className="text-[10px] font-bold font-mono text-amber-400 uppercase tracking-widest">Metadata Block #{selectedBlock.number}</h4>
                     <span className="text-[8.5px] text-white/40 font-mono">{selectedBlock.sizeKb.toFixed(2)} KB</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2 font-mono text-[8px] text-white/40 col-span-2">
+                  <div className="grid grid-cols-2 gap-2 mt-2 font-mono text-[8px] text-white/40">
                     <div className="truncate">hash: <strong className="text-white/70 select-all">{selectedBlock.hash}</strong></div>
                     <div>validator: <strong className="text-white/70">{selectedBlock.validator}</strong></div>
                   </div>
                 </div>
 
                 {/* Simulated Ledger Logs inside block */}
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-44 pr-1 no-scrollbar">
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-44 pr-1 no-scrollbar-y">
                   <span className="text-[8px] font-mono uppercase text-white/40 block mb-1">Decentralized Transactions Ledger</span>
                   
                   {selectedBlock.transactions.length === 0 ? (
@@ -261,7 +263,7 @@ export default function NetworkExplorer({
                     </div>
                   ) : (
                     selectedBlock.transactions.map((tx) => (
-                      <div key={tx.id} className="bg-[#020208]/40 p-2 px-2.5 rounded-xl border border-white/10 flex justify-between items-center text-[9.5px]">
+                      <div key={tx.id} className="bg-black/60 p-2 px-2.5 rounded-xl border border-white/10 flex justify-between items-center text-[9.5px]">
                         <div className="flex flex-col gap-0.5 shrink">
                           <p className="font-mono text-white/80 truncate max-w-[125px]">
                             {tx.sender.startsWith('C_') ? tx.sender : `sender: ${tx.sender.substring(0, 10)}...`}
@@ -271,7 +273,7 @@ export default function NetworkExplorer({
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="font-mono font-semibold text-cyan-400">+{tx.amount.toFixed(2)} VMC</span>
+                          <span className="font-mono font-semibold text-amber-400">+{tx.amount.toFixed(2)} POKI</span>
                           <span className="text-[8px] text-white/30 block font-mono">gas: {tx.fee}</span>
                         </div>
                       </div>
@@ -281,7 +283,7 @@ export default function NetworkExplorer({
               </div>
             ) : (
               <div className="flex-1 flex flex-col justify-center items-center text-center p-6 gap-2">
-                <Database className="w-7 h-7 text-white/20" />
+                <Database className="w-7 h-7 text-white/20 animate-pulse" />
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-widest text-white/70">No Block Selected</h3>
                   <p className="text-[10px] text-white/40 leading-normal max-w-[170px] mx-auto mt-1 font-sans">
