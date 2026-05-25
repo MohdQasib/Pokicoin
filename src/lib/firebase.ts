@@ -1,9 +1,11 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { getDatabase, ref, set, get, child, update } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
 let db: any = null;
+let rtdb: any = null;
 let auth: any = null;
 let useFirebase = false;
 
@@ -11,6 +13,7 @@ if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== 
   try {
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     db = getFirestore(app);
+    rtdb = getDatabase(app);
     auth = getAuth(app);
     useFirebase = true;
     console.log("Firebase initialized successfully for Poki Koin Hub!");
@@ -21,7 +24,7 @@ if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey.trim() !== 
   console.log("Using Mock/Local Database mode. Configure firebase-applet-config.json to sync with Firestore cloud backend.");
 }
 
-export { db, auth, useFirebase };
+export { db, rtdb, auth, useFirebase };
 
 // Standard Firestore operation error handler defined in the Firebase Integration Skill
 export enum OperationType {

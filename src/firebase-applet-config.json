@@ -1,9 +1,10 @@
 {
-  "apiKey": "",
-  "authDomain": "",
-  "projectId": "",
-  "storageBucket": "",
-  "messagingSenderId": "",
-  "appId": "",
-  "firestoreDatabaseId": ""
+  "apiKey": "AIzaSyCXZkKCbqZNB-gWIoKiZE4E6W977_H4PcU",
+  "authDomain": "pokicoin-3a02c.firebaseapp.com",
+  "databaseURL": "https://pokicoin-3a02c-default-rtdb.firebaseio.com",
+  "projectId": "pokicoin-3a02c",
+  "storageBucket": "pokicoin-3a02c.firebasestorage.app",
+  "messagingSenderId": "660501737397",
+  "appId": "1:660501737397:web:7fe47fb288b6b65208f3fc",
+  "firestoreDatabaseId": "(default)"
 }

@@ -19,7 +19,8 @@ import {
   Gamepad2,
   Trash2,
   Tv,
-  Coins
+  Coins,
+  LogOut
 } from 'lucide-react';
 
 import { MiningTeamMember, WalletState, Transaction, Block, KYCDetails, MiningSession } from './types';
@@ -30,6 +31,11 @@ import KycPortal from './components/KycPortal';
 import NetworkExplorer from './components/NetworkExplorer';
 import WhitepaperQuiz from './components/WhitepaperQuiz';
 import GamePortal from './components/GamePortal';
+import OnboardingAuth from './components/OnboardingAuth';
+
+import { auth, rtdb } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { ref, get, update } from 'firebase/database';
 
 // Default initial network contacts
 const DEFAULT_MEMBERS: MiningTeamMember[] = [
@@ -153,6 +159,79 @@ export default function App() {
   useEffect(() => {
     balanceRef.current = balance;
   }, [balance]);
+
+  // --- AUTHENTICATION STATE GATEWAY ---
+  const [firebaseUser, setFirebaseUser] = useState<{ name: string; email: string; phone?: string; uid?: string } | null>(() => {
+    const savedName = localStorage.getItem('poki_user_name');
+    const savedEmail = localStorage.getItem('poki_user_email');
+    const savedUid = localStorage.getItem('poki_user_uid');
+    if (savedEmail && savedName) {
+      return { name: savedName, email: savedEmail, uid: savedUid || 'guest_user' };
+    }
+    return null;
+  });
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!auth) {
+      setAuthLoading(false);
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        let name = user.displayName || user.email?.split('@')[0] || 'Poki Miner';
+        let email = user.email || `${user.phoneNumber || user.uid}@poki.in`;
+        let phone = user.phoneNumber || '';
+        
+        try {
+          const userRef = ref(rtdb, `users/${user.uid}`);
+          const snapshot = await get(userRef);
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            if (data.fullName) name = data.fullName;
+            if (data.email) email = data.email;
+            if (data.phone) phone = data.phone;
+            
+            // Sync saved remote balance
+            if (data.balance !== undefined && data.balance > balanceRef.current) {
+              setBalance(data.balance);
+            }
+          }
+        } catch (e) {
+          console.warn("Handshake remote profile fetch error:", e);
+        }
+
+        setFirebaseUser({ name, email, phone, uid: user.uid });
+        localStorage.setItem('poki_user_logged', 'true');
+        localStorage.setItem('poki_user_name', name);
+        localStorage.setItem('poki_user_email', email);
+        localStorage.setItem('poki_user_uid', user.uid);
+      } else {
+        setFirebaseUser(null);
+        localStorage.removeItem('poki_user_logged');
+        localStorage.removeItem('poki_user_name');
+        localStorage.removeItem('poki_user_email');
+        localStorage.removeItem('poki_user_uid');
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync state values to Realtime DB
+  useEffect(() => {
+    if (firebaseUser?.uid && rtdb) {
+      const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
+      const timer = setTimeout(() => {
+        update(userRef, {
+          balance: balance,
+          transferableBalance: walletState.transferableBalance,
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.debug("Syncing balance in background failed:", err));
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [balance, firebaseUser, walletState.transferableBalance]);
 
   // Save states to local storage
   useEffect(() => {
@@ -489,6 +568,21 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } catch (e) {
+      console.warn("Gracefully bypassed signout connection state error: ", e);
+    }
+    localStorage.removeItem('poki_user_logged');
+    localStorage.removeItem('poki_user_name');
+    localStorage.removeItem('poki_user_email');
+    localStorage.removeItem('poki_user_uid');
+    window.location.reload();
+  };
+
   const handleGameRewardAwarded = (amount: number) => {
     // Add rewards from gaming immediately to the central state (sync in real time!)
     setBalance(prev => prev + amount);
@@ -497,6 +591,34 @@ export default function App() {
       transferableBalance: prev.transferableBalance + amount
     }));
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#080602] flex items-center justify-center text-white p-6 font-mono relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[20%] left-[20%] w-[60%] h-[60%] bg-amber-950/15 rounded-full blur-[140px]"></div>
+        </div>
+        <div className="flex flex-col items-center gap-4 text-center z-10">
+          <div className="w-12 h-12 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
+          <p className="text-[10px] tracking-[0.22em] uppercase text-amber-500/80 font-bold animate-pulse">Establishing Security Consensus Handshake...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!firebaseUser) {
+    return (
+      <OnboardingAuth 
+        onLoginSuccess={(userInfo) => {
+          setFirebaseUser(userInfo);
+          localStorage.setItem('poki_user_logged', 'true');
+          localStorage.setItem('poki_user_name', userInfo.name);
+          localStorage.setItem('poki_user_email', userInfo.email);
+          if (userInfo.uid) localStorage.setItem('poki_user_uid', userInfo.uid);
+        }} 
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#080602] text-white font-sans flex flex-col xl:flex-row antialiased overflow-x-hidden relative">
@@ -616,18 +738,39 @@ export default function App() {
         </div>
 
         {/* Action resets */}
-        <div className="flex justify-between items-center bg-white/[0.02] p-4 rounded-xl border border-white/10">
-          <div className="text-[9px] text-white/30 font-mono uppercase tracking-wider">
-            <p className="text-white/40 font-bold">Poki Core Sync v2.1.0</p>
-            <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR EXCHANGE</p>
+        <div className="flex flex-col gap-3.5 bg-white/[0.02] p-4 rounded-2xl border border-white/10">
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[9.5px] font-mono text-white/80 font-bold uppercase tracking-wider">
+                {firebaseUser?.name ? `Node: ${firebaseUser.name}` : "Core Node online"}
+              </span>
+            </div>
+            
+            <button
+              onClick={handleLogout}
+              className="text-[8.5px] font-bold tracking-widest font-mono text-amber-400 hover:text-amber-300 uppercase flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sign Out
+            </button>
           </div>
-          <button
-            id="clear-persistence-desktop-btn"
-            onClick={handleClearPersistence}
-            className="text-[9px] font-semibold tracking-widest font-mono bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 px-3 py-1.5 rounded-lg cursor-pointer transition-colors uppercase"
-          >
-            Clear State
-          </button>
+
+          <div className="h-[1px] bg-white/10"></div>
+
+          <div className="flex justify-between items-center">
+            <div className="text-[9px] text-white/30 font-mono uppercase tracking-wider">
+              <p className="text-white/40 font-bold">Poki Core Sync v2.1.0</p>
+              <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR EXCHANGE</p>
+            </div>
+            <button
+              id="clear-persistence-desktop-btn"
+              onClick={handleClearPersistence}
+              className="text-[9px] font-semibold tracking-widest font-mono bg-red-400/10 hover:bg-red-400/20 border border-red-400/20 hover:border-red-400/40 text-red-500 px-3 py-1.5 rounded-lg cursor-pointer transition-colors uppercase"
+            >
+              Clear State
+            </button>
+          </div>
         </div>
 
       </div>
