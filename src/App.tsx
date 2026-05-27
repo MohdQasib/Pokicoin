@@ -8,30 +8,32 @@ import {
   Database, 
   BookOpen, 
   Sparkles, 
-  Info, 
-  TrendingUp, 
-  Smartphone,
-  Layers,
-  Activity,
-  Cpu,
-  Globe,
-  BellRing,
   Gamepad2,
   Trash2,
-  Tv,
-  Coins,
-  LogOut
+  LogOut,
+  Sliders,
+  Menu,
+  ShieldAlert,
+  Mail,
+  User,
+  Info,
+  Layers,
+  Settings,
+  X,
+  Check,
+  Gift,
+  UserPlus
 } from 'lucide-react';
 
-import { MiningTeamMember, WalletState, Transaction, Block, KYCDetails, MiningSession } from './types';
+import { MiningTeamMember, WalletState, Transaction, Block, KYCDetails } from './types';
 import MiningHub from './components/MiningHub';
-import TeamManager from './components/TeamManager';
 import WalletHub from './components/WalletHub';
 import KycPortal from './components/KycPortal';
 import NetworkExplorer from './components/NetworkExplorer';
 import WhitepaperQuiz from './components/WhitepaperQuiz';
 import GamePortal from './components/GamePortal';
 import OnboardingAuth from './components/OnboardingAuth';
+import logoUrl from './assets/images/pokicoin_premium_logo_v3_1779866751607.png';
 
 import { auth, rtdb } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -81,16 +83,16 @@ const DEFAULT_BLOCKS: Block[] = [
 ];
 
 export default function App() {
-  // Top-Level Active Portal Switcher (Portal A vs Portal B)
-  const [activePortal, setActivePortal] = useState<'A' | 'B'>('A');
+  // Redesigned exactly 5 tabs state routing: 'mining' | 'games' | 'earning' | 'wallet' | 'more'
+  const [activeTab, setActiveTab] = useState<'mining' | 'games' | 'earning' | 'wallet' | 'more'>('mining');
 
-  // Mobile frame Portal A tab routing
-  const [activeTab, setActiveTab] = useState<'mine' | 'team' | 'wallet' | 'kyc' | 'explorer' | 'academy'>('mine');
+  // Subpage states inside the Tab 5 MORE view
+  const [moreSubView, setMoreSubView] = useState<'none' | 'ledger' | 'specs' | 'terms' | 'contact' | 'about' | 'monetization'>('none');
 
   // --- STATE DECLARATIONS ---
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('vmc_mining_balance');
-    return saved ? parseFloat(saved) : 10.0; // Start with a seed of 10 coins
+    return saved ? parseFloat(saved) : 10.0;
   });
 
   const [isMining, setIsMining] = useState<boolean>(() => {
@@ -116,9 +118,9 @@ export default function App() {
       privateKeyPhrase: 'poki koin smart algorithm consensus secure phone validator decentral mainnet trust peer',
       isCreated: true,
       isUnlocked: true,
-      unverifiedBalance: 2.24, // unverified start
-      transferableBalance: 7.76, // transferable start
-      migratedBalance: 0.5 // starts with 0.5 migrated
+      unverifiedBalance: 2.24,
+      transferableBalance: 7.76,
+      migratedBalance: 0.5
     };
   });
 
@@ -138,7 +140,30 @@ export default function App() {
     return localStorage.getItem('vmc_quiz_booster') === 'true';
   });
 
-  // Blockchain Ledger Simulator State
+  const [isMissionClaimed, setIsMissionClaimed] = useState<boolean>(() => {
+    const claimedDate = localStorage.getItem('poki_daily_mission_claimed_date');
+    return claimedDate === new Date().toDateString();
+  });
+
+  useEffect(() => {
+    const syncMissionState = () => {
+      const claimedDate = localStorage.getItem('poki_daily_mission_claimed_date');
+      setIsMissionClaimed(claimedDate === new Date().toDateString());
+    };
+    window.addEventListener('storage', syncMissionState);
+    const interval = setInterval(syncMissionState, 1500);
+    return () => {
+      window.removeEventListener('storage', syncMissionState);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const referralCount = useMemo(() => {
+    const totalInvitees = teamMembers.filter(m => !m.isSecurityCircle).length;
+    // We start with 3 default invitees. Newly added invitees count toward the 5 invitations target.
+    return Math.min(5, Math.max(0, totalInvitees - 3));
+  }, [teamMembers]);
+
   const [blocks, setBlocks] = useState<Block[]>(() => {
     const saved = localStorage.getItem('vmc_ledger_blocks');
     return saved ? JSON.parse(saved) : DEFAULT_BLOCKS;
@@ -151,7 +176,7 @@ export default function App() {
 
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
 
-  // Refs for precise ticker accumulation
+  // Refs for micro-ticker loop
   const lastTickTimeRef = useRef<number>(Date.now());
   const balanceRef = useRef<number>(balance);
 
@@ -160,7 +185,7 @@ export default function App() {
     balanceRef.current = balance;
   }, [balance]);
 
-  // --- AUTHENTICATION STATE GATEWAY ---
+  // --- FIREBASE AND AUTH CONNECTIONS ---
   const [firebaseUser, setFirebaseUser] = useState<{ name: string; email: string; phone?: string; uid?: string } | null>(() => {
     const savedName = localStorage.getItem('poki_user_name');
     const savedEmail = localStorage.getItem('poki_user_email');
@@ -172,6 +197,103 @@ export default function App() {
   });
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
+  // --- USER PROFILE AND LOCAL CARD DATA ---
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    age: '',
+    country: ''
+  });
+
+  // Load / initialize Profile Information from Local or Firebase
+  useEffect(() => {
+    if (firebaseUser) {
+      const savedCard = localStorage.getItem('poki_profile_card_details');
+      if (savedCard) {
+        setProfileForm(JSON.parse(savedCard));
+      } else {
+        const spaceIdx = firebaseUser.name.indexOf(' ');
+        const derivedFirst = spaceIdx > 0 ? firebaseUser.name.substring(0, spaceIdx) : firebaseUser.name;
+        const derivedLast = spaceIdx > 0 ? firebaseUser.name.substring(spaceIdx + 1) : '';
+        setProfileForm({
+          firstName: derivedFirst,
+          lastName: derivedLast,
+          email: firebaseUser.email,
+          phone: firebaseUser.phone || '9198765432',
+          age: '24',
+          country: 'India'
+        });
+      }
+    }
+  }, [firebaseUser]);
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('poki_profile_card_details', JSON.stringify(profileForm));
+    
+    // Update active memory session name as well
+    const updatedName = `${profileForm.firstName} ${profileForm.lastName}`.trim();
+    if (firebaseUser) {
+      const nextUser = { ...firebaseUser, name: updatedName, email: profileForm.email, phone: profileForm.phone };
+      setFirebaseUser(nextUser);
+      localStorage.setItem('poki_user_name', updatedName);
+      localStorage.setItem('poki_user_email', profileForm.email);
+    }
+    alert("📝 Personal validator parameters verified and safely locked into the device environment!");
+  };
+
+  // --- 2X SPEED BOOST STATE ENGINE ---
+  const [isSpeedBoostActive, setIsSpeedBoostActive] = useState<boolean>(() => {
+    const expiry = localStorage.getItem('poki_speed_boost_expiry');
+    if (!expiry) return false;
+    return Date.now() < parseInt(expiry);
+  });
+  const [speedBoostExpiresAt, setSpeedBoostExpiresAt] = useState<number>(() => {
+    const expiry = localStorage.getItem('poki_speed_boost_expiry');
+    return expiry ? parseInt(expiry) : 0;
+  });
+  const [speedBoostCountdown, setSpeedBoostCountdown] = useState<string>('00:00:00');
+
+  useEffect(() => {
+    if (!isSpeedBoostActive || speedBoostExpiresAt === 0) {
+      setSpeedBoostCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const remainingMs = speedBoostExpiresAt - Date.now();
+      if (remainingMs <= 0) {
+        setIsSpeedBoostActive(false);
+        setSpeedBoostExpiresAt(0);
+        localStorage.removeItem('poki_speed_boost_expiry');
+        setSpeedBoostCountdown('00:00:00');
+      } else {
+        const totalSecs = Math.floor(remainingMs / 1000);
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+        setSpeedBoostCountdown(`${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [isSpeedBoostActive, speedBoostExpiresAt]);
+
+  const handleStartSpeedBoost = () => {
+    const duration = 6 * 60 * 60 * 1000; // 6 hours
+    const expiry = Date.now() + duration;
+    setSpeedBoostExpiresAt(expiry);
+    setIsSpeedBoostActive(true);
+    localStorage.setItem('poki_speed_boost_expiry', expiry.toString());
+    alert("⚡ Consensus boost aligned successfully! Your speed is doubled to +0.0760 POKI/hr for 6 Hours code!");
+  };
+
+  // Firebase auth connection monitoring
   useEffect(() => {
     if (!auth) {
       setAuthLoading(false);
@@ -191,14 +313,12 @@ export default function App() {
             if (data.fullName) name = data.fullName;
             if (data.email) email = data.email;
             if (data.phone) phone = data.phone;
-            
-            // Sync saved remote balance
             if (data.balance !== undefined && data.balance > balanceRef.current) {
               setBalance(data.balance);
             }
           }
         } catch (e) {
-          console.warn("Handshake remote profile fetch error:", e);
+          console.warn("RTDB Profile fetching error:", e);
         }
 
         setFirebaseUser({ name, email, phone, uid: user.uid });
@@ -218,7 +338,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync state values to Realtime DB
+  // Sync state values back to Firebase Realtime DB
   useEffect(() => {
     if (firebaseUser?.uid && rtdb) {
       const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
@@ -233,7 +353,7 @@ export default function App() {
     }
   }, [balance, firebaseUser, walletState.transferableBalance]);
 
-  // Save states to local storage
+  // Save states back to standard local states
   useEffect(() => {
     localStorage.setItem('vmc_mining_balance', balance.toString());
   }, [balance]);
@@ -267,39 +387,37 @@ export default function App() {
     localStorage.setItem('vmc_address_txs', JSON.stringify(transactions));
   }, [transactions]);
 
-
-  // --- SPEED RATE METRIC BREAKDOWNS (Hourly metrics) ---
-  const BASE_RATE = 0.02; // constant base
+  // --- MINING HOURLY METRICS & MODIFIERS ---
+  const BASE_RATE = 0.02;
   
   const SECURITY_CIRCLE_RATE = useMemo(() => {
-    // Each security contact adds +0.004 POKI/hr and cap at 5 members max
     const securityCount = teamMembers.filter(m => m.isSecurityCircle).length;
     return Math.min(5, securityCount) * 0.004;
   }, [teamMembers]);
 
   const REFERRAL_RATE = useMemo(() => {
-    // Each referral contact who is active adds +0.005 POKI/hr
     const activeRef = teamMembers.filter(m => !m.isSecurityCircle && m.isActive).length;
     return activeRef * 0.005;
   }, [teamMembers]);
 
   const QUIZ_RATE = useMemo(() => {
-    return quizPremiumBooster ? 0.05 : 0.0;
+    return quizPremiumBooster ? 0.01 : 0.0;
   }, [quizPremiumBooster]);
 
+  // Calculate real structural rate, double if active SPEED BOOST is engaged!
   const TOTAL_MINING_RATE = useMemo(() => {
-    return BASE_RATE + SECURITY_CIRCLE_RATE + REFERRAL_RATE + QUIZ_RATE;
-  }, [BASE_RATE, SECURITY_CIRCLE_RATE, REFERRAL_RATE, QUIZ_RATE]);
+    const baseSum = BASE_RATE + SECURITY_CIRCLE_RATE + REFERRAL_RATE + QUIZ_RATE;
+    return isSpeedBoostActive ? baseSum * 2 : baseSum;
+  }, [BASE_RATE, SECURITY_CIRCLE_RATE, REFERRAL_RATE, QUIZ_RATE, isSpeedBoostActive]);
 
-
-  // --- COUNTDOWN / SESSION TIMER MANAGER ---
+  // 24H cycles timer countdown
   useEffect(() => {
     if (!isMining || sessionStartTime === 0) {
       setTimeLeftMs(0);
       return;
     }
 
-    const sessionDuration = 24 * 60 * 60 * 1000; // 24 hours in ms
+    const sessionDuration = 24 * 60 * 60 * 1000;
     
     const interval = setInterval(() => {
       const elapsed = Date.now() - sessionStartTime;
@@ -317,123 +435,101 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isMining, sessionStartTime]);
 
-
-  // --- REAL-TIME HIGH FREQUENCY MICRO-TICKER LOOP ---
+  // Real-time precise idle mining state counter tick
   useEffect(() => {
-    let animationFrameId: number;
+    if (!isMining || TOTAL_MINING_RATE <= 0) return;
+
     lastTickTimeRef.current = Date.now();
 
-    const tick = () => {
+    const interval = setInterval(() => {
       const now = Date.now();
-      const elapsedMs = now - lastTickTimeRef.current;
+      const elapsed = now - lastTickTimeRef.current;
       lastTickTimeRef.current = now;
 
-      if (isMining && TOTAL_MINING_RATE > 0 && elapsedMs > 0) {
-        // Convert hourly rate to millisecond rate
+      if (elapsed > 0) {
         const ratePerMs = TOTAL_MINING_RATE / (3600 * 1000);
-        const earned = ratePerMs * elapsedMs;
+        const earned = ratePerMs * elapsed;
         
-        // Accumulate balance and separate into transferable/unverified pools
-        const nextBalance = balanceRef.current + earned;
-        setBalance(nextBalance);
-        
-        // Ratio update for wallet display
-        // Standard self-accrued rate is BASE_RATE + QUIZ_RATE
-        // Teammates accrued is SECURITY_CIRCLE_RATE + REFERRAL_RATE
-        const selfRatio = (BASE_RATE + QUIZ_RATE) / TOTAL_MINING_RATE;
+        const nextBal = balanceRef.current + earned;
+        setBalance(nextBal);
+
+        const selfRatio = (BASE_RATE + QUIZ_RATE) / (isSpeedBoostActive ? (TOTAL_MINING_RATE / 2) : TOTAL_MINING_RATE);
         const refereeRatio = 1 - selfRatio;
 
         setWalletState(prev => {
-          const addedTransferable = earned * selfRatio;
-          const addedUnverified = earned * refereeRatio;
+          const addTransferable = earned * selfRatio;
+          const addUnverified = earned * refereeRatio;
           return {
             ...prev,
-            transferableBalance: prev.transferableBalance + addedTransferable,
-            unverifiedBalance: prev.unverifiedBalance + addedUnverified
+            transferableBalance: prev.transferableBalance + addTransferable,
+            unverifiedBalance: prev.unverifiedBalance + addUnverified
           };
         });
       }
+    }, 1000);
 
-      animationFrameId = requestAnimationFrame(tick);
-    };
+    return () => clearInterval(interval);
+  }, [isMining, TOTAL_MINING_RATE, isSpeedBoostActive]);
 
-    animationFrameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isMining, TOTAL_MINING_RATE]);
-
-
-  // --- AUTOMATED BLOCK FORGER SIMULATOR (Every 5.2 seconds) ---
+  // Blockchain block compiler (for ledger simulation)
   useEffect(() => {
     const blockInterval = setInterval(() => {
-      setBlocks(prevBlocks => {
-        const nextBlockHeight = prevBlocks[0].number + 1;
-        const timestampNow = Date.now();
-        const validatorNames = ['Validator London', 'Validator San Francisco', 'Validator Tokyo', 'Validator Singapore', 'Validator Sydney'];
-        const selectedValidator = validatorNames[Math.floor(Math.random() * validatorNames.length)];
+      const txs = [...pendingTransactions];
+      if (txs.length > 0) {
+        setPendingTransactions([]);
+      }
 
-        // Pull queued transactions
-        const txsToInclude = [...pendingTransactions];
-        setPendingTransactions([]); // clear queue
+      const nextHeight = blocks[0] ? blocks[0].number + 1 : 489312;
+      const nextParentHash = blocks[0] ? blocks[0].hash : generateBlockHash(nextHeight - 1);
 
-        const newBlock: Block = {
-          number: nextBlockHeight,
-          hash: generateBlockHash(nextBlockHeight),
-          parentHash: prevBlocks[0].hash,
-          timestamp: timestampNow,
-          transactionCount: txsToInclude.length + (Math.random() > 0.4 ? 1 : 0), // include dummy consensus fees
-          sizeKb: parseFloat((0.51 + Math.random() * 1.5).toFixed(2)),
-          validator: selectedValidator,
-          transactions: txsToInclude.length > 0 ? txsToInclude.map(tx => ({...tx, blockNumber: nextBlockHeight, status: 'success'})) : []
-        };
+      const nextBlock: Block = {
+        number: nextHeight,
+        hash: generateBlockHash(nextHeight),
+        parentHash: nextParentHash,
+        timestamp: Date.now(),
+        transactionCount: txs.length + (Math.random() > 0.5 ? 1 : 0),
+        sizeKb: parseFloat((0.45 + Math.random() * 1.6).toFixed(2)),
+        validator: 'Singapore Validator Node #' + Math.floor(Math.random() * 100),
+        transactions: txs.map(t => ({ ...t, blockNumber: nextHeight, status: 'success' }))
+      };
 
-        // If there were actual pending transactions mapped, update the resolved status in history
-        if (txsToInclude.length > 0) {
-          setTransactions(prevTxs => {
-            return prevTxs.map(t => {
-              const matchedPending = txsToInclude.find(pending => pending.id === t.id);
-              if (matchedPending) {
-                return { ...t, status: 'success', blockNumber: nextBlockHeight };
-              }
-              return t;
-            });
+      setBlocks(prev => [nextBlock, ...prev.slice(0, 8)]);
+
+      if (txs.length > 0) {
+        setTransactions(prevTxs => {
+          return prevTxs.map(t => {
+            const matches = txs.find(pending => pending.id === t.id);
+            if (matches) {
+              return { ...t, status: 'success', blockNumber: nextHeight };
+            }
+            return t;
           });
-        }
-
-        return [newBlock, ...prevBlocks.slice(0, 8)]; // keep latest 9 blocks
-      });
-    }, 5200);
+        });
+      }
+    }, 5500);
 
     return () => clearInterval(blockInterval);
-  }, [pendingTransactions]);
+  }, [pendingTransactions, blocks]);
 
-
-  // --- EVENT HANDLERS ---
+  // Event managers
   const handleStartMining = () => {
     if (isMining) return;
     setIsMining(true);
     setSessionStartTime(Date.now());
-    setTimeLeftMs(24 * 60 * 60 * 1000);
+    setTimeLeftMs(2 * 60 * 60 * 1000); // 24 hours
   };
 
   const handleAddMember = (name: string, isSecurity: boolean) => {
     const nextId = 'member_' + Math.random().toString(36).substring(2, 9);
-    const colors = [
-      'bg-emerald-500 text-emerald-100',
-      'bg-indigo-500 text-indigo-100',
-      'bg-pink-500 text-pink-100',
-      'bg-amber-500 text-amber-955',
-      'bg-teal-500 text-teal-100',
-      'bg-purple-500 text-purple-100',
-      'bg-orange-500 text-orange-100'
-    ];
-    const pickedColor = colors[Math.floor(Math.random() * colors.length)];
+    const colors = ['bg-emerald-500 text-emerald-100', 'bg-indigo-500 text-indigo-100', 'bg-pink-500 text-pink-100', 'bg-amber-500 text-amber-955'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
 
     const newMember: MiningTeamMember = {
       id: nextId,
       name,
       role: isSecurity ? 'Security' : 'Invitee',
-      isActive: true, // starts active to trigger boost feedback instantly
-      avatarColor: pickedColor,
+      isActive: true,
+      avatarColor: color,
       miningContribution: isSecurity ? 0.004 : 0.005,
       isSecurityCircle: isSecurity
     };
@@ -446,14 +542,9 @@ export default function App() {
   };
 
   const handlePingMember = (id: string) => {
-    // Set inactive referral member to active for 4 minutes to let user check metrics
     setTeamMembers(prev => prev.map(m => {
       if (m.id === id) {
-        return {
-          ...m,
-          isActive: true,
-          lastPingTime: Date.now()
-        };
+        return { ...m, isActive: true, lastPingTime: Date.now() };
       }
       return m;
     }));
@@ -465,7 +556,7 @@ export default function App() {
       publicKey,
       privateKeyPhrase: passphrase,
       isCreated: true,
-      isUnlocked: true // auto unlock on create
+      isUnlocked: true
     }));
   };
 
@@ -481,7 +572,7 @@ export default function App() {
 
   const handleSendTransaction = (recipient: string, amount: number) => {
     if (amount > walletState.migratedBalance) {
-      return { success: false, error: 'Insufficient migrated ledger balance.' };
+      return { success: false, error: 'Insufficient balance' };
     }
 
     const txId = 'tx_' + Math.random().toString(36).substring(2, 10);
@@ -492,17 +583,15 @@ export default function App() {
       amount,
       fee: 0.0001,
       timestamp: Date.now(),
-      blockNumber: 0, // pending
+      blockNumber: 0,
       status: 'pending'
     };
 
-    // Deduct transaction details from spendable balance
     setWalletState(prev => ({
       ...prev,
       migratedBalance: prev.migratedBalance - (amount + 0.0001)
     }));
 
-    // Add to transaction logs and queue for block mining forge
     setTransactions(prev => [newTx, ...prev]);
     setPendingTransactions(prev => [...prev, newTx]);
 
@@ -522,23 +611,18 @@ export default function App() {
   };
 
   const handleKycApprove = () => {
-    setKycDetails(prev => ({
-      ...prev,
-      status: 'approved'
-    }));
+    setKycDetails(prev => ({ ...prev, status: 'approved' }));
   };
 
   const handleUnlockQuizBooster = () => {
     setQuizPremiumBooster(true);
+    alert("📝 Consensus Specs verified! +0.0100 POKI/h boost is active.");
   };
 
   const handleMigrateBalance = () => {
     if (kycDetails.status !== 'approved' || walletState.transferableBalance <= 0) return;
 
-    // Migrate self-mined transferable balance over to spendable migrated wallet ledger balance
     const transferableToMigrate = walletState.transferableBalance;
-    
-    // Log as a special "System Ledger Migration" transaction on the blockchain explorer!
     const migrationTxId = 'mig_' + Math.random().toString(36).substring(2, 10);
     const migrationTx: Transaction = {
       id: migrationTxId,
@@ -547,7 +631,7 @@ export default function App() {
       amount: transferableToMigrate,
       fee: 0.0,
       timestamp: Date.now(),
-      blockNumber: 0, // pending
+      blockNumber: 0,
       status: 'pending'
     };
 
@@ -561,35 +645,36 @@ export default function App() {
     }));
   };
 
-  const handleClearPersistence = () => {
-    if (confirm('Are you sure you want to hard reset all virtual mining parameters? Your local mock blockchain progress will be cleared.')) {
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
-
   const handleLogout = async () => {
     try {
       if (auth) {
         await signOut(auth);
       }
     } catch (e) {
-      console.warn("Gracefully bypassed signout connection state error: ", e);
+      console.warn("Authentication signout bypassed structurally: ", e);
     }
     localStorage.removeItem('poki_user_logged');
     localStorage.removeItem('poki_user_name');
     localStorage.removeItem('poki_user_email');
     localStorage.removeItem('poki_user_uid');
+    localStorage.removeItem('poki_profile_card_details');
+    localStorage.removeItem('poki_is_admin');
     window.location.reload();
   };
 
   const handleGameRewardAwarded = (amount: number) => {
-    // Add rewards from gaming immediately to the central state (sync in real time!)
     setBalance(prev => prev + amount);
     setWalletState(prev => ({
       ...prev,
       transferableBalance: prev.transferableBalance + amount
     }));
+  };
+
+  const handleClearPersistence = () => {
+    if (confirm('Verify: Reset entire device blockchain credentials?')) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   if (authLoading) {
@@ -599,8 +684,8 @@ export default function App() {
           <div className="absolute top-[20%] left-[20%] w-[60%] h-[60%] bg-amber-950/15 rounded-full blur-[140px]"></div>
         </div>
         <div className="flex flex-col items-center gap-4 text-center z-10">
-          <div className="w-12 h-12 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
-          <p className="text-[10px] tracking-[0.22em] uppercase text-amber-500/80 font-bold animate-pulse">Establishing Security Consensus Handshake...</p>
+          <div className="w-10 h-10 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
+          <p className="text-[10px] tracking-[0.22em] uppercase text-amber-500/80 font-bold animate-pulse">Connecting Decentracode Ledger Gateway...</p>
         </div>
       </div>
     );
@@ -621,387 +706,907 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080602] text-white font-sans flex flex-col xl:flex-row antialiased overflow-x-hidden relative">
+    <div className="w-full min-h-screen bg-[#080602] text-white flex flex-col relative select-none antialiased">
       
       {/* Background ambient radial blur lights matching Immersive UI Design - Warm Gold Glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-amber-950/20 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-yellow-950/15 rounded-full blur-[150px]"></div>
-        <div className="absolute top-[40%] left-[30%] w-[35%] h-[35%] bg-amber-900/10 rounded-full blur-[110px]"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#b45309]/5 rounded-full blur-[130px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#d97706]/7 rounded-full blur-[150px]"></div>
       </div>
 
-      {/* LEFT SIDEBAR: Broad decentralized telemetry dashboard metrics (Desktop-Only Panel) */}
-      <div className="hidden xl:flex xl:w-5/12 p-8 flex-col justify-between border-r border-white/10 backdrop-blur-md bg-white/[0.01] relative z-10">
+      {/* Center web-container with responsive balance - on mobile 100%, on desktop centered nicely */}
+      <div className="w-full max-w-2xl mx-auto flex flex-col flex-grow relative z-10 bg-[#0c0a06]/35 min-h-screen border-x border-white/5 shadow-2xl pb-24">
         
-        {/* Title / Brand Header */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-tr from-amber-500 to-yellow-500 rounded-lg flex items-center justify-center shadow-lg shadow-amber-500/25">
-              <Sparkles className="w-5 h-5 text-black animate-pulse" />
+        {/* APP HEADER */}
+        <header className="w-full bg-[#0c0a06]/90 border-b border-white/5 py-4 px-6 flex items-center justify-between sticky top-0 z-30 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl relative shadow-md shadow-amber-500/10 flex items-center justify-center overflow-hidden shrink-0">
+              <img 
+                src={logoUrl} 
+                alt="Pokicoin Golden Logo" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 border border-white/10 rounded-xl"></div>
             </div>
             <div>
-              <h1 className="text-xl font-display font-medium tracking-widest text-[#f5fbfd] select-none">
-                POKI<span className="text-amber-400 font-bold">NET</span>
+              <h1 className="text-sm font-[900] tracking-wider uppercase text-white leading-none">
+                POKI<span className="text-amber-500">COIN</span>
               </h1>
-              <p className="text-[10px] text-amber-500/80 tracking-[0.2em] font-mono uppercase font-bold">minipocicoin.in • CONSENSUS</p>
-            </div>
-          </div>
-          <p className="text-xs text-white/55 max-w-sm mt-4 leading-relaxed border-l border-amber-400/30 pl-3">
-            Real-time smartphone mining protocol and game rewards simulator. Earn and swap synchronized <strong>Poki Koins</strong> dynamically through high-fidelity quorums.
-          </p>
-        </div>
-
-        {/* Central telemetry logs info */}
-        <div className="flex flex-col gap-6 my-6">
-          
-          <h3 className="text-[10px] text-amber-400 font-bold uppercase tracking-[0.3em] leading-none">Console Telemetry Indices</h3>
-          
-          <div className="grid grid-cols-2 gap-4">
-            
-            {/* Height Indicator */}
-            <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="absolute right-0 top-0 w-16 h-16 bg-amber-500/5 rounded-full blur-md"></div>
-              <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">Ledger Height</span>
-                <Layers className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-2xl font-light font-display mt-2 text-white">#{blocks[0].number}</p>
-              <span className="text-[8.5px] font-mono text-amber-400 flex items-center gap-1 mt-1.5">
-                • Sync validated OK
-              </span>
-            </div>
-
-            {/* Mining Velocity */}
-            <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="absolute right-0 top-0 w-16 h-16 bg-yellow-500/5 rounded-full blur-md"></div>
-              <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider font-sans">Node Velocity</span>
-                <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
-              </div>
-              <p className="text-2xl font-light font-display mt-2 text-white">+{TOTAL_MINING_RATE.toFixed(4)} <span className="text-xs text-white/40 font-mono">/hr</span></p>
-              <span className={`text-[8.5px] font-mono flex items-center gap-1 mt-1.5 ${isMining ? 'text-amber-400 font-bold' : 'text-white/40'}`}>
-                {isMining ? '⚡ Core actively hashing' : '💤 Core simulation idle'}
-              </span>
-            </div>
-
-            {/* Active Nodes */}
-            <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">Global Validators</span>
-                <Globe className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className="text-2xl font-light font-display mt-2 text-white">512<span className="text-xs text-white/30">/512</span></p>
-              <span className="text-[8.5px] font-mono text-amber-400/80 flex items-center gap-1 mt-1.5">
-                • Quorum threshold stable
-              </span>
-            </div>
-
-            {/* KYC status details */}
-            <div className="bg-white/[0.04] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              <div className="flex items-center justify-between text-white/40">
-                <span className="text-[9px] font-bold font-mono uppercase tracking-wider">KYC Audit State</span>
-                <Cpu className="w-4 h-4 text-amber-400" />
-              </div>
-              <p className={`text-sm font-bold font-display mt-2.5 uppercase tracking-widest ${
-                kycDetails.status === 'approved' 
-                  ? 'text-amber-400 font-black' 
-                  : kycDetails.status === 'verifying' 
-                  ? 'text-yellow-500 animate-pulse font-bold' 
-                  : 'text-white/40'
-              }`}>
-                {kycDetails.status === 'approved' ? 'VALIDATED' : kycDetails.status === 'verifying' ? 'AUDITING...' : 'REQUIRED'}
-              </p>
-              <span className="text-[8.5px] font-mono text-white/30 flex items-center gap-1 mt-1.5 font-sans">
-                Prevents bot farms
-              </span>
-            </div>
-
-          </div>
-
-          {/* Halving progress bar */}
-          <div className="bg-white/[0.03] border border-white/10 p-5 rounded-2xl backdrop-blur-sm shadow-inner flex flex-col gap-2.5">
-            <div className="flex justify-between text-[9px] text-[#facc15] font-bold font-mono uppercase tracking-widest">
-              <span>Next Core Halving Pool</span>
-              <span>85% FILLED</span>
-            </div>
-            
-            <div className="relative w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/10">
-              <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400" style={{ width: '85%' }}></div>
-            </div>
-
-            <div className="flex justify-between text-[8px] text-white/30 font-mono uppercase tracking-wide">
-              <span>Rate: {TOTAL_MINING_RATE.toFixed(4)} POKI/hr</span>
-              <span>Target: {(TOTAL_MINING_RATE / 2).toFixed(4)} (Post Halving)</span>
+              <span className="text-[7.5px] font-mono tracking-widest text-white/40 uppercase leading-none block mt-1">Concentric Quorum</span>
             </div>
           </div>
 
-        </div>
-
-        {/* Action resets */}
-        <div className="flex flex-col gap-3.5 bg-white/[0.02] p-4 rounded-2xl border border-white/10">
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[9.5px] font-mono text-white/80 font-bold uppercase tracking-wider">
-                {firebaseUser?.name ? `Node: ${firebaseUser.name}` : "Core Node online"}
-              </span>
-            </div>
-            
+          <div className="flex items-center gap-2.5">
+            {/* Global Signout header trigger */}
             <button
               onClick={handleLogout}
-              className="text-[8.5px] font-bold tracking-widest font-mono text-amber-400 hover:text-amber-300 uppercase flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-[8px] font-bold tracking-widest font-mono text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/25 bg-red-500/5 px-2 py-1 rounded bg-opacity-40 cursor-pointer transition-colors uppercase"
             >
-              <LogOut className="w-3.5 h-3.5" /> Sign Out
+              Log out
             </button>
-          </div>
 
-          <div className="h-[1px] bg-white/10"></div>
-
-          <div className="flex justify-between items-center">
-            <div className="text-[9px] text-white/30 font-mono uppercase tracking-wider">
-              <p className="text-white/40 font-bold">Poki Core Sync v2.1.0</p>
-              <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR EXCHANGE</p>
-            </div>
+            {/* Profile Avatar Trigger Button */}
             <button
-              id="clear-persistence-desktop-btn"
-              onClick={handleClearPersistence}
-              className="text-[9px] font-semibold tracking-widest font-mono bg-red-400/10 hover:bg-red-400/20 border border-red-400/20 hover:border-red-400/40 text-red-500 px-3 py-1.5 rounded-lg cursor-pointer transition-colors uppercase"
+              onClick={() => setProfileModalOpen(true)}
+              className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-black flex items-center justify-center font-extrabold text-xs cursor-pointer shadow active:scale-95 transition-all outline-none"
             >
-              Clear State
+              {profileForm.firstName ? profileForm.firstName.substring(0, 1).toUpperCase() : 'U'}
             </button>
           </div>
-        </div>
+        </header>
 
-      </div>
-
-
-      {/* RIGHT PANEL: High-Fidelity smartphone frame hosting the dual-portal app */}
-      <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 md:p-8 relative z-10 w-full max-w-xl mx-auto">
-        
-        {/* PORTAL SELECTOR: Beautiful premium pills allowing instant transfer between Portal A and Portal B */}
-        <div className="w-full max-w-sm flex bg-black/60 border border-white/10 rounded-2xl p-1 mb-5 relative z-10 backdrop-blur-xl shadow-lg">
-          <button
-            id="portal-a-select"
-            onClick={() => setActivePortal('A')}
-            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activePortal === 'A'
-                ? 'bg-gradient-to-tr from-amber-500 to-yellow-500 text-black shadow-md font-extrabold'
-                : 'text-white/40 hover:text-white/70'
-            }`}
-          >
-            <Smartphone className="w-4 h-4" />
-            Portal A: Miner
-          </button>
-          
-          <button
-            id="portal-b-select"
-            onClick={() => setActivePortal('B')}
-            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activePortal === 'B'
-                ? 'bg-gradient-to-tr from-amber-500 to-yellow-500 text-black shadow-md font-extrabold'
-                : 'text-white/40 hover:text-white/70'
-            }`}
-          >
-            <Gamepad2 className="w-4 h-4" />
-            Portal B: Arcade
-          </button>
-        </div>
-
-        {/* Curvaceous Smartphone container markup */}
-        <div className="w-full max-w-sm h-[740px] rounded-[48px] bg-black/90 border-[8px] border-white/10 shadow-[0_25px_60px_rgba(245,158,11,0.05)] relative flex flex-col overflow-hidden ring-1 ring-white/15 backdrop-blur-xl">
-          
-          {/* Top Notch speaker and camera bar mock */}
-          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-5 bg-white/10 rounded-b-2xl z-50 flex items-center justify-center pointer-events-none">
-            <div className="w-10 h-1 bg-black rounded-full mb-1"></div>
-            <div className="w-2 h-2 bg-black rounded-full ml-4 mb-1"></div>
-          </div>
-
-          {/* Core Simulated App viewport */}
-          <div className="flex-1 flex flex-col h-full pt-6 relative bg-transparent">
+        {/* VIEWPORT CONTROLLER */}
+        <div className="flex-grow w-full flex flex-col">
+          <AnimatePresence mode="wait">
             
-            <AnimatePresence mode="wait">
-              {activePortal === 'A' ? (
-                /* PORTAL A: CORE MINING APP WITH INTERNAL NAVIGATION */
-                <motion.div
-                  key="portal-a"
-                  initial={{ opacity: 0, x: -15 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 15 }}
-                  transition={{ duration: 0.3 }}
-                  className="flex-1 flex flex-col overflow-hidden"
-                >
-                  <div className="flex-1 overflow-hidden h-full">
-                    {activeTab === 'mine' && (
-                      <MiningHub
-                        balance={balance}
-                        miningRate={TOTAL_MINING_RATE}
-                        isMining={isMining}
-                        onStartMining={handleStartMining}
-                        timeLeftMs={timeLeftMs}
-                        teamMembers={teamMembers}
-                        quizPremiumBooster={quizPremiumBooster}
-                        baseRate={BASE_RATE}
-                        securityCircleRate={SECURITY_CIRCLE_RATE}
-                        referralRate={REFERRAL_RATE}
-                        quizRate={QUIZ_RATE}
-                        onRewardAwarded={handleGameRewardAwarded}
-                      />
-                    )}
+            {/* TAB 1: MINING HUB */}
+            {activeTab === 'mining' && (
+              <motion.div
+                key="tab-mining"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1"
+              >
+                <MiningHub
+                  balance={balance}
+                  miningRate={TOTAL_MINING_RATE}
+                  isMining={isMining}
+                  onStartMining={handleStartMining}
+                  timeLeftMs={timeLeftMs}
+                  teamMembers={teamMembers}
+                  quizPremiumBooster={quizPremiumBooster}
+                  baseRate={BASE_RATE}
+                  securityCircleRate={SECURITY_CIRCLE_RATE}
+                  referralRate={REFERRAL_RATE}
+                  quizRate={QUIZ_RATE}
+                  onRewardAwarded={handleGameRewardAwarded}
+                  // Boost additions
+                  isSpeedBoostActive={isSpeedBoostActive}
+                  speedBoostCountdown={speedBoostCountdown}
+                  onStartSpeedBoost={handleStartSpeedBoost}
+                  onAddMember={handleAddMember}
+                  onRemoveMember={handleRemoveMember}
+                  onPingMember={handlePingMember}
+                />
+              </motion.div>
+            )}
 
-                    {activeTab === 'team' && (
-                      <TeamManager
-                        teamMembers={teamMembers}
-                        onAddMember={handleAddMember}
-                        onRemoveMember={handleRemoveMember}
-                        onPingMember={handlePingMember}
-                      />
-                    )}
+            {/* TAB 2: GAMES / ARCADE PORTAL */}
+            {activeTab === 'games' && (
+              <motion.div
+                key="tab-games"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1"
+              >
+                <GamePortal
+                  balance={balance}
+                  walletState={walletState}
+                  onRewardAwarded={handleGameRewardAwarded}
+                />
+              </motion.div>
+            )}
 
-                    {activeTab === 'wallet' && (
-                      <WalletHub
-                        walletState={walletState}
-                        onWalletCreate={handleWalletCreate}
-                        onWalletUnlock={handleWalletUnlock}
-                        onWalletLock={handleWalletLock}
-                        onSendTransaction={handleSendTransaction}
-                        onMigrateBalance={handleMigrateBalance}
-                        kycApproved={kycDetails.status === 'approved'}
-                        transactions={transactions}
-                        teamMembers={teamMembers}
-                        balance={balance}
-                      />
-                    )}
+            {/* TAB 3: MORE EARNING (SURVEYS & TASKS MODULE) */}
+            {activeTab === 'earning' && (
+              <motion.div
+                key="tab-earning"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1 p-5 md:p-6"
+              >
+                <div className="flex flex-col gap-5">
+                  {/* Beautiful Title Segment */}
+                  <div className="border-b border-white/10 pb-3">
+                    <h3 className="text-base font-bold uppercase tracking-widest text-[#facc15]">More Earning Portal</h3>
+                    <p className="text-[9.5px] uppercase tracking-wider text-white/40 mt-1">Boost Miner Hashpower by Completing sponsored Tasks & Surveys</p>
+                  </div>
 
-                    {activeTab === 'kyc' && (
-                      <KycPortal
-                        kycDetails={kycDetails}
-                        onKycSubmit={handleKycSubmit}
-                        onKycApprove={handleKycApprove}
-                      />
-                    )}
+                  {/* Daily Mission - Recruit 5 New Nodes */}
+                  <div className="bg-[#100d07] border border-amber-500/20 rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_30px_rgba(245,158,11,0.03)]">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 blur-2xl rounded-full translate-x-1/3 -translate-y-1/3"></div>
+                    
+                    <div className="flex items-center justify-between mb-4.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500">
+                          <Gift className="w-4 h-4 animate-bounce" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[8px] font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full">ACTIVE DAILY MISSION</span>
+                          </div>
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider mt-0.5">Dual-Consensus Recruiter</h4>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <span className="text-[9.5px] font-mono font-extrabold text-[#facc15] bg-[#fac515]/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner">+25.0 POKI</span>
+                      </div>
+                    </div>
 
-                    {activeTab === 'explorer' && (
+                    <p className="text-[10px] text-white/60 leading-relaxed max-w-md">
+                      Invite <strong className="text-white">5 new validator nodes</strong> to establish a larger peer network. Both invitees and the local operator get massive ledger allocations.
+                    </p>
+
+                    {/* Progress Segment */}
+                    <div className="mt-4 bg-[#14110b]/80 border border-white/[0.03] rounded-2xl p-3.5">
+                      <div className="flex items-center justify-between text-[10px] font-mono mb-2">
+                        <span className="text-white/40 uppercase font-bold text-[8.5px] tracking-wider">Recruitment Progress</span>
+                        <span className="text-amber-400 font-extrabold">{referralCount} / 5 Nodes Invited</span>
+                      </div>
+                      
+                      {/* Real Progress Bar */}
+                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 rounded-full transition-all duration-500"
+                          style={{ width: `${(referralCount / 5) * 100}%` }}
+                        ></div>
+                      </div>
+
+                      {/* Micro inline action to recruit a member instantly */}
+                      {referralCount < 5 && !isMissionClaimed && (
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const target = e.target as HTMLFormElement;
+                            const input = target.elements.namedItem('nodeName') as HTMLInputElement;
+                            const newName = input.value.trim();
+                            if (newName) {
+                              handleAddMember(newName, false);
+                              input.value = '';
+                            }
+                          }}
+                          className="mt-3.5 flex gap-2"
+                        >
+                          <input 
+                            name="nodeName"
+                            type="text" 
+                            required
+                            placeholder="Enter friend's miner alias..."
+                            className="bg-black/40 border border-white/5 hover:border-white/10 focus:border-amber-500/40 text-[9.5px] text-white placeholder-white/30 px-3 py-2 rounded-xl flex-1 focus:outline-none transition-all font-sans leading-relaxed"
+                          />
+                          <button 
+                            type="submit"
+                            className="bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer select-none active:scale-95"
+                          >
+                            🚀 INVITE NODE
+                          </button>
+                        </form>
+                      )}
+
+                      {/* Claim reward panel */}
+                      <div className="mt-3.5 flex items-center justify-between border-t border-white/[0.04] pt-3.5">
+                        <div className="text-[9px] text-white/40">
+                          {isMissionClaimed 
+                            ? "✓ Reward of 25.0 POKI successfully claimed today."
+                            : referralCount >= 5 
+                            ? "🎉 Mission completed! Core networks synchronized." 
+                            : "Add more validator peers to verify consensus."}
+                        </div>
+                        
+                        {isMissionClaimed ? (
+                          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 tracking-wider text-[8.5px] font-mono font-bold px-3.5 py-1.5 rounded-xl uppercase">
+                            <Check className="w-3 h-3 shrink-0" />
+                            Claimed
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={referralCount < 5}
+                            onClick={() => {
+                              // Claim reward!
+                              const bonusReward = 25.0;
+                              const updatedBal = balance + bonusReward;
+                              setBalance(updatedBal);
+                              localStorage.setItem('vmc_mining_balance', updatedBal.toString());
+                              
+                              if (firebaseUser?.uid && rtdb) {
+                                try {
+                                  const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
+                                  update(userRef, { balance: updatedBal });
+                                } catch (e) {
+                                  console.warn("RTDB balance sync during claim error:", e);
+                                }
+                              }
+                              
+                              localStorage.setItem('poki_daily_mission_claimed_date', new Date().toDateString());
+                              setIsMissionClaimed(true);
+                              alert("🎉 Daily Recruiter Mission Claimed! +25.0 POKI added directly to your mining pool.");
+                            }}
+                            className={`px-4 py-1.5 rounded-xl text-[9px] uppercase tracking-widest font-mono font-extrabold transition-all outline-none ${
+                              referralCount >= 5 
+                                ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:shadow-[0_0_20px_rgba(245,158,11,0.6)] cursor-pointer active:scale-95' 
+                                : 'bg-white/5 border border-white/5 text-white/30 cursor-not-allowed'
+                            }`}
+                          >
+                            🎁 Claim 25 POKI
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aesthetic Layout for Future Survey & Task Integrations */}
+                  <div className="bg-[#120f09]/40 border border-amber-500/10 rounded-3xl p-5 text-center flex flex-col items-center gap-3 py-8">
+                    <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mb-1">
+                      <Sparkles className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Survey & Task Engine Integration</h4>
+                    <p className="text-[10px] text-white/50 max-w-sm leading-relaxed">
+                      This earning module is specifically reserved for surveys, custom offerwalls, and monetization. Perfect for integrating external SDKs like Pollfish, Tapjoy, or custom Google Ad Exchange rewards.
+                    </p>
+                    <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-mono uppercase tracking-widest px-3.5 py-1.5 rounded-full mt-2">
+                      <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping"></span>
+                      Sandbox Ready: Dynamic SDK Hook Pending
+                    </div>
+                  </div>
+
+                  {/* Illustrative Tasks Widgets matching Pokicoin theme */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[8px] font-mono tracking-widest text-amber-400 uppercase bg-amber-400/10 px-2 py-0.5 rounded">High Payout</span>
+                          <span className="text-[9.5px] text-amber-400 font-extrabold font-mono">+10.0 POKI</span>
+                        </div>
+                        <h5 className="text-xs font-bold text-white uppercase tracking-wide">Sponsored Polls & Surveys</h5>
+                        <p className="text-[9.5px] text-white/40 mt-1 leading-normal">
+                          Give critical feedback on next-gen tech. Your survey responses direct funding directly to consensus pools.
+                        </p>
+                      </div>
+                      <button disabled className="mt-4 w-full bg-white/5 border border-white/10 text-white/40 text-[9px] uppercase tracking-wider font-mono py-2 rounded-xl cursor-not-allowed">
+                        Integrate Poll/Survey SDK Here
+                      </button>
+                    </div>
+
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[8px] font-mono tracking-widest text-emerald-400 uppercase bg-emerald-400/10 px-2 py-0.5 rounded">Direct Task</span>
+                          <span className="text-[9.5px] text-emerald-400 font-extrabold font-mono">+5.50 POKI</span>
+                        </div>
+                        <h5 className="text-xs font-bold text-white uppercase tracking-wide">Dynamic Social Retweets</h5>
+                        <p className="text-[9.5px] text-white/40 mt-1 leading-normal">
+                          Complete immediate Twitter/Telegram subscription verifications to instantly multiply daily mining gains.
+                        </p>
+                      </div>
+                      <button disabled className="mt-4 w-full bg-white/5 border border-white/10 text-white/40 text-[9px] uppercase tracking-wider font-mono py-2 rounded-xl cursor-not-allowed">
+                        Integrate Task Auth Check
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              </motion.div>
+            )}
+
+            {/* TAB 4: WALLET & INR MATRIX */}
+            {activeTab === 'wallet' && (
+              <motion.div
+                key="tab-wallet"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1"
+              >
+                <WalletHub
+                  walletState={walletState}
+                  onWalletCreate={handleWalletCreate}
+                  onWalletUnlock={handleWalletUnlock}
+                  onWalletLock={handleWalletLock}
+                  onSendTransaction={handleSendTransaction}
+                  onMigrateBalance={handleMigrateBalance}
+                  kycApproved={kycDetails.status === 'approved'}
+                  transactions={transactions}
+                  teamMembers={teamMembers}
+                  balance={balance}
+                />
+
+                {/* Integration of KYC submission portal right beside wallet for core balance migration */}
+                <div className="px-6 pb-6 mt-4">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-amber-500">KYC Validation Engine</div>
+                      <span className="text-[8px] font-mono bg-white/5 px-2 py-0.5 rounded text-white/45 uppercase">Identity lock</span>
+                    </div>
+                    
+                    <KycPortal
+                      kycDetails={kycDetails}
+                      onKycSubmit={handleKycSubmit}
+                      onKycApprove={handleKycApprove}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* TAB 5: MORE SUBMENU ROOT */}
+            {activeTab === 'more' && (
+              <motion.div
+                key="tab-more"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex-1 p-4 md:p-6"
+              >
+                {moreSubView === 'none' ? (
+                  <div className="flex flex-col gap-5">
+                    {/* Sticky section sub-title */}
+                    <div className="border-b border-white/10 pb-3">
+                      <h3 className="text-base font-bold uppercase tracking-widest text-[#f5fbfd]">Concentric Sub-Pages Menu</h3>
+                      <p className="text-[9.5px] uppercase tracking-wider text-white/40 mt-1">Explore verifiable ledgers and developer contacts</p>
+                    </div>
+
+                    {/* Subpage dynamic list */}
+                    <div className="flex flex-col gap-3">
+                      
+                      {/* item 1: Ledger Network Explorer */}
+                      <button
+                        onClick={() => setMoreSubView('ledger')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">Verifiable Blockchain Ledger</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Sync Height #{blocks[0].number}</p>
+                        </div>
+                        <Database className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 group-hover:rotate-6 transition-all shrink-0" />
+                      </button>
+
+                      {/* item 2: Specs Whitepaper */}
+                      <button
+                        onClick={() => setMoreSubView('specs')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">Technical Validator Specs</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Verify consensus & active quiz boosts</p>
+                        </div>
+                        <BookOpen className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 group-hover:scale-105 transition-all shrink-0" />
+                      </button>
+
+                      {/* item 3: Terms & Conditions */}
+                      <button
+                        onClick={() => setMoreSubView('terms')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">Terms & General Guidelines</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Legal network parameters</p>
+                        </div>
+                        <ShieldAlert className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 transition-all shrink-0" />
+                      </button>
+
+                      {/* item 4: Support Contact Us */}
+                      <button
+                        onClick={() => setMoreSubView('contact')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">Support Helpline & Contacts</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Connect directly to core protocol nodes</p>
+                        </div>
+                        <Mail className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 transition-all shrink-0" />
+                      </button>
+
+                      {/* item 5: About Us details */}
+                      <button
+                        onClick={() => setMoreSubView('about')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">About Pokicoin Network</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Halving curves & Decentralized autonomous setups</p>
+                        </div>
+                        <Info className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 transition-all shrink-0" />
+                      </button>
+
+                      {/* item 6: Ad Exchange Consent & Monetization Disclosure */}
+                      <button
+                        onClick={() => setMoreSubView('monetization')}
+                        className="w-full bg-[#0c0a06] hover:bg-[#120f09] border border-white/5 rounded-2xl p-4.5 text-left flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-md"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase group-hover:text-amber-400 transition-colors">Ad Exchange Consent & Monetization</h4>
+                          <p className="text-[9.5px] text-white/40 mt-1 uppercase font-mono tracking-wider">Required disclosures for Google AdSense compliance</p>
+                        </div>
+                        <Sparkles className="w-4.5 h-4.5 text-white/20 group-hover:text-amber-500 transition-all shrink-0" />
+                      </button>
+
+                    </div>
+
+                    {/* Telemetry settings reset */}
+                    <div className="bg-[#120f09]/60 border border-amber-500/10 rounded-2xl p-4 flex justify-between items-center mt-6">
+                      <div className="text-[9.5px] text-white/30 font-mono uppercase tracking-wider pl-1 font-semibold leading-relaxed">
+                        <p className="text-amber-400/90 font-bold">Node persistence console</p>
+                        <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR ledger parity</p>
+                      </div>
+                      <button
+                        onClick={handleClearPersistence}
+                        className="text-[9.5px] font-bold tracking-widest font-mono bg-red-400/10 hover:bg-red-400/20 border border-red-400/25 text-red-500 px-3.5 py-1.5 rounded-xl cursor-pointer transition-colors uppercase"
+                      >
+                        Clear State
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {/* Compact Back Button header */}
+                    <button
+                      onClick={() => setMoreSubView('none')}
+                      className="self-start text-[9.5px] font-extrabold tracking-widest font-mono text-amber-500/80 hover:text-amber-400 uppercase bg-amber-500/10 border border-amber-500/20 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer mb-5 outline-none transition-all"
+                    >
+                      ← Back to Sub-Pages menu
+                    </button>
+
+                    {/* Subpage components triggers */}
+                    {moreSubView === 'ledger' && (
                       <NetworkExplorer
                         blocks={blocks}
                         activeBlockHeight={blocks[0].number}
                       />
                     )}
 
-                    {activeTab === 'academy' && (
+                    {moreSubView === 'specs' && (
                       <WhitepaperQuiz
                         quizPremiumBooster={quizPremiumBooster}
                         onUnlockQuizBooster={handleUnlockQuizBooster}
                       />
                     )}
+
+                    {moreSubView === 'terms' && (
+                      <div className="bg-[#0c0a06] border border-white/5 rounded-3xl p-5 md:p-6 text-left shadow-lg">
+                        <h4 className="text-sm font-bold uppercase tracking-widest text-[#facc15] border-b border-white/5 pb-2.5 mb-4">Concentric Network Rules</h4>
+                        
+                        <div className="flex flex-col gap-4 font-sans text-xs text-white/60 leading-relaxed pl-1">
+                          <p>
+                            <strong>1. Single Device Consensus:</strong> Each individual smartphone is authorized to host only 1 validator node. Operating bot-farms, emulator virtual servers or multiclient cloning modules will violate consensus security signatures.
+                          </p>
+                          <p>
+                            <strong>2. KYC Validation Compliance:</strong> Verified human consensus signatures are required to unlock, convert and migrate direct Mining transferable balances over to Spendable Wallet ledger pools. Anonymous tokens without KYC are subject to quarantine.
+                          </p>
+                          <p>
+                            <strong>3. Halving Protocol:</strong> Dynamic rate reductions will occur automatically on specific ledger thresholds to protect network token metrics. The next regular halving will restrict consensus speed velocity by 50%.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {moreSubView === 'contact' && (
+                      <div className="bg-[#0c0a06] border border-white/5 rounded-3xl p-5 md:p-6 text-left shadow-lg flex flex-col gap-4">
+                        <h4 className="text-sm font-bold uppercase tracking-widest text-[#facc15] border-b border-white/5 pb-2.5">Global Help Circle Nodes</h4>
+                        
+                        <div className="flex flex-col gap-3 text-xs leading-relaxed font-sans text-white/65">
+                          <p className="flex justify-between border-b border-white/[0.03] pb-2">
+                            <span className="font-semibold">Sovereign Domain:</span>
+                            <span className="text-amber-400 font-mono">support.minipocicoin.in</span>
+                          </p>
+                          <p className="flex justify-between border-b border-white/[0.03] pb-2">
+                            <span className="font-semibold">Security Consensus:</span>
+                            <span className="text-amber-400 font-mono">consensus@miniot.org</span>
+                          </p>
+                          <p className="flex justify-between pb-1">
+                            <span className="font-semibold">Developer Telegram Node:</span>
+                            <span className="text-amber-400 font-mono">@PokiKoinSovereignNode</span>
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white/5 rounded-2xl text-[10px] leading-relaxed text-white/45 font-sans mt-1">
+                          Our security circle is monitored 24/7. Response velocity is determined by active network transaction block queues.
+                        </div>
+                      </div>
+                    )}
+
+                    {moreSubView === 'about' && (
+                      <div className="bg-[#0c0a06] border border-white/5 rounded-3xl p-5 md:p-6 text-left shadow-lg flex flex-col gap-4">
+                        <h4 className="text-sm font-bold uppercase tracking-widest text-[#facc15] border-b border-white/5 pb-2.5">About Poki Networks</h4>
+                        
+                        <p className="text-xs text-white/65 leading-relaxed font-sans pl-1">
+                          Pokicoin represents India's leading lightweight virtual server mining quorum, allowing normal consumer smartphones to participate safely in decentralised ledger validations without heating chips or wasting lithium batteries.
+                        </p>
+                        <p className="text-xs text-white/65 leading-relaxed font-sans pl-1">
+                          By linking dynamic security circles and mining quorums, users confirm transaction blocks directly in background micro-threads. Under cryptographic INR parities, 1 POKI establishes a solid consensus equivalent of exactly ₹0.50 INR.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3 mt-2 text-center text-xs font-mono">
+                          <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <span className="text-white/35 text-[9px] block uppercase">Next Halving Pool</span>
+                            <span className="text-[#facc15] font-bold block mt-1">85% Filled</span>
+                          </div>
+                          <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
+                            <span className="text-white/35 text-[9px] block uppercase">Genesis Block Era</span>
+                            <span className="text-emerald-400 font-bold block mt-1">2026 ACTIVE</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {moreSubView === 'monetization' && (
+                      <div className="bg-[#0c0a06] border border-white/5 rounded-3xl p-5 md:p-6 text-left shadow-lg flex flex-col gap-4">
+                        <h4 className="text-sm font-bold uppercase tracking-widest text-[#facc15] border-b border-white/5 pb-2.5">Ad Exchange & Monetization Policies</h4>
+                        
+                        <div className="flex flex-col gap-4 font-sans text-xs text-white/60 leading-relaxed pl-1">
+                          <p>
+                            <strong>Google AdSense & Certified Ad Exchange Compliance:</strong>
+                            <br />
+                            This application complies with standard Google Publisher Policies to serve clean, family-safe, relevant advertisements. Third-party vendors, including Google, use device cookies to serve ads based on user interests or prior sessions on Pokicoin.
+                          </p>
+                          <p>
+                            <strong>1. Personalised Advertising Disclosures:</strong>
+                            <br />
+                            Google's use of advertising cookies enables it and its partners to serve ads securely. Users can completely opt out of personalized advertising by visiting Google's Ad Settings center or by accessing <span className="text-amber-400 font-mono">www.aboutads.info</span>.
+                          </p>
+                          <p>
+                            <strong>2. Consent & Privacy Policy Parameters:</strong>
+                            <br />
+                            We comply strictly with GDPR (European Union consent matrix) and CCPA (California Privacy laws). Absolutely no sensitive secure variables like private keys, seed matrix words, or submitted KYC details are shared or processed outside. Only general regional analytics is sent for high-speed ledger synchronization.
+                          </p>
+                        </div>
+
+                        <div className="p-3 bg-white/5 rounded-2xl text-[10px] leading-relaxed text-white/45 font-sans mt-2">
+                          Please direct formal inquiries regarding Ad Consent Frameworks to <span className="text-amber-400 font-mono">compliance@minipocicoin.in</span>. This ensures immediate review by core protocol nodes.
+                        </div>
+                      </div>
+                    )}
+
                   </div>
+                )}
+              </motion.div>
+            )}
 
-                  {/* Bottom persistent smartphone navigation dock */}
-                  <div className="bg-[#0a0802] border-t border-white/10 py-3.5 px-1 flex justify-between items-center shrink-0 backdrop-blur-md relative z-10 select-none">
-                    
-                    {/* Mine Tab Button */}
-                    <button
-                      id="dock-tab-mine"
-                      onClick={() => setActiveTab('mine')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'mine' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <Zap className={`w-4 h-4 ${activeTab === 'mine' && isMining ? 'text-amber-400 fill-amber-400/20 animate-pulse' : ''}`} />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">Mining</span>
-                    </button>
-
-                    {/* Team Tab Button */}
-                    <button
-                      id="dock-tab-team"
-                      onClick={() => setActiveTab('team')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'team' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">Team</span>
-                    </button>
-
-                    {/* Wallet Tab Button */}
-                    <button
-                      id="dock-tab-wallet"
-                      onClick={() => setActiveTab('wallet')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'wallet' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <Key className="w-4 h-4" />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">Wallet</span>
-                    </button>
-
-                    {/* KYC Tab Button */}
-                    <button
-                      id="dock-tab-kyc"
-                      onClick={() => setActiveTab('kyc')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'kyc' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">KYC</span>
-                    </button>
-
-                    {/* Explorer Tab Button */}
-                    <button
-                      id="dock-tab-explorer"
-                      onClick={() => setActiveTab('explorer')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'explorer' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <Database className="w-4 h-4" />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">Ledger</span>
-                    </button>
-
-                    {/* Academy Tab Button */}
-                    <button
-                      id="dock-tab-academy"
-                      onClick={() => setActiveTab('academy')}
-                      className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 ${
-                        activeTab === 'academy' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
-                      }`}
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      <span className="text-[8px] font-bold tracking-wider uppercase">Specs</span>
-                    </button>
-
-                  </div>
-                </motion.div>
-              ) : (
-                /* PORTAL B: INTEGRATED HIGH RESILIENCE GAME PORTAL */
-                <motion.div
-                  key="portal-b"
-                  initial={{ opacity: 0, x: 15 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -15 }}
-                  transition={{ duration: 0.3 }}
-                  className="flex-1 flex flex-col overflow-hidden h-full"
-                >
-                  <GamePortal
-                    balance={balance}
-                    walletState={walletState}
-                    onRewardAwarded={handleGameRewardAwarded}
-                  />
-                  
-                  {/* Subtle navigation note */}
-                  <div className="bg-[#0a0802] border-t border-white/5 py-3 text-center text-[9px] text-[#facc15]/65 uppercase tracking-widest shrink-0 font-medium font-sans">
-                    🔀 Use top toggle to return to Mining Hub
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-          </div>
-
+          </AnimatePresence>
         </div>
 
+        {/* DEVELOPER/TESTER SYSTEM TELEMETRY CONTROLLER PANEL */}
+        {(firebaseUser?.email?.toLowerCase() === 'uu104015@gmail.com' || localStorage.getItem('poki_is_admin') === 'true') && (
+          <div className="fixed bottom-[74px] sm:bottom-[78px] left-0 right-0 z-30 w-full max-w-xl mx-auto px-4 pointer-events-none select-none">
+            <div className="bg-[#0b0802]/95 border border-amber-500/40 rounded-2xl p-3 shadow-[0_0_20px_rgba(245,158,11,0.3)] font-mono pointer-events-auto flex flex-col gap-2 backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/[0.05] pb-1.5">
+                <div className="flex items-center gap-1.5 text-amber-400 font-extrabold text-[9.5px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  ADMIN SYSTEM TELEMETRY
+                </div>
+                <div className="text-[7.5px] text-white/50 uppercase tracking-widest font-bold">uu104015@gmail.com (Tester Account)</div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('poki_spin_count_today', '0');
+                    localStorage.setItem('poki_spin_date', new Date().toDateString());
+                    window.dispatchEvent(new Event('storage'));
+                    alert("🔄 Wheel spins reset! You have 3/3 daily spins available.");
+                  }}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  ♻️ Wheel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('poki_scratch_count_today', '0');
+                    localStorage.setItem('poki_scratch_date', new Date().toDateString());
+                    window.dispatchEvent(new Event('storage'));
+                    alert("🔄 Scratch cards reset! Cards are unlocked & scratchable.");
+                  }}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  ♻️ Scratch
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('poki_streak_last_claim', '0');
+                    localStorage.setItem('poki_streak_claimed', '0');
+                    window.dispatchEvent(new Event('storage'));
+                    alert("🔄 Check-in resets! Progressive validations are claimable.");
+                  }}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  ♻️ Check-In
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('poki_daily_mission_claimed_date');
+                    setIsMissionClaimed(false);
+                    window.dispatchEvent(new Event('storage'));
+                    alert("🔄 Invite Mission reset! Goal is now claimable on completion.");
+                  }}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  ♻️ Mission
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTeamMembers(DEFAULT_MEMBERS);
+                    localStorage.setItem('vmc_team_members', JSON.stringify(DEFAULT_MEMBERS));
+                    alert("👥 Network Team reset to default! Referral Progress is now 0/5.");
+                  }}
+                  className="bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 hover:border-yellow-400 text-yellow-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  👥 Reset Team
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bonus = 500;
+                    const newBal = balance + bonus;
+                    setBalance(newBal);
+                    localStorage.setItem('vmc_mining_balance', newBal.toString());
+                    if (firebaseUser?.uid && rtdb) {
+                      try {
+                        const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
+                        update(userRef, { balance: newBal });
+                      } catch (e) {
+                        console.warn("RTDB sync error on admin inject:", e);
+                      }
+                    }
+                    alert(`💰 Added +${bonus} POKI directly to balance ledger!`);
+                  }}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-400 text-emerald-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
+                >
+                  ➕ +500 POKI
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWalletState(prev => {
+                      const updated = {
+                        ...prev,
+                        transferableBalance: prev.transferableBalance + 1000
+                      };
+                      localStorage.setItem('vmc_wallet_state', JSON.stringify(updated));
+                      if (firebaseUser?.uid && rtdb) {
+                        try {
+                          const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
+                          update(userRef, { transferableBalance: updated.transferableBalance });
+                        } catch (e) {
+                          console.warn("RTDB transferable sync error:", e);
+                        }
+                      }
+                      return updated;
+                    });
+                    alert("💎 Gained +1000 POKI Transferable Balance!");
+                  }}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-400 text-emerald-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px] col-span-2 md:col-span-1"
+                >
+                  💎 +1k Trans
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BOTTOM NAVIGATION FIXED BAR */}
+        <nav className="fixed bottom-0 left-0 right-0 z-30 w-full bg-[#0a0802] border-t border-white/[0.04] backdrop-blur-2xl py-3.5 shadow-2xl shrink-0 select-none">
+          <div className="w-full max-w-2xl mx-auto px-1 flex justify-between items-center sm:px-4">
+            
+            {/* 1. MINING */}
+            <button
+              id="bottom-tab-mining"
+              onClick={() => { setActiveTab('mining'); setMoreSubView('none'); }}
+              className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
+                activeTab === 'mining' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+              }`}
+            >
+              <Zap className={`w-4 h-4 ${activeTab === 'mining' && isMining ? 'text-amber-400 fill-amber-400/20 animate-pulse' : ''}`} />
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Mining</span>
+            </button>
+
+            {/* 2. GAME ARCADE */}
+            <button
+              id="bottom-tab-games"
+              onClick={() => { setActiveTab('games'); setMoreSubView('none'); }}
+              className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
+                activeTab === 'games' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4" />
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Arcade</span>
+            </button>
+
+            {/* 3. MORE EARNING */}
+            <button
+              id="bottom-tab-earning"
+              onClick={() => { setActiveTab('earning'); setMoreSubView('none'); }}
+              className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
+                activeTab === 'earning' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+              }`}
+            >
+              <Sparkles className={`w-4 h-4 ${activeTab === 'earning' ? 'text-amber-400 fill-amber-400/10' : ''}`} />
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Earning</span>
+            </button>
+
+            {/* 4. WALLET */}
+            <button
+              id="bottom-tab-wallet"
+              onClick={() => { setActiveTab('wallet'); setMoreSubView('none'); }}
+              className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
+                activeTab === 'wallet' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+              }`}
+            >
+              <Key className="w-4 h-4" />
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Wallet</span>
+            </button>
+
+            {/* 5. MORE */}
+            <button
+              id="bottom-tab-more"
+              onClick={() => setActiveTab('more')}
+              className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
+                activeTab === 'more' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
+              }`}
+            >
+              <Menu className="w-4.5 h-4.5" />
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">More</span>
+            </button>
+
+          </div>
+        </nav>
+
       </div>
+
+      {/* ===================== USER PROFILE MODAL OVERLAY ===================== */}
+      <AnimatePresence>
+        {profileModalOpen && (
+          <dialog
+            open
+            className="fixed inset-0 bg-black/95 w-full h-full p-4 flex items-center justify-center z-40 backdrop-blur-md overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="bg-[#0c0a06] border border-amber-500/20 max-w-sm w-full p-6 sm:p-7 rounded-3xl relative flex flex-col shadow-2xl relative select-none text-white my-8 max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <button
+                onClick={() => setProfileModalOpen(false)}
+                className="absolute top-4 right-4 text-white/40 hover:text-white p-1 rounded-full text-xs cursor-pointer outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="text-center pt-2 mb-5">
+                <div className="w-11 h-11 bg-gradient-to-tr from-amber-500 to-yellow-500 rounded-full flex items-center justify-center text-black font-black text-sm mx-auto mb-2">
+                  {profileForm.firstName ? profileForm.firstName.substring(0, 1).toUpperCase() : 'U'}
+                </div>
+                <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-[#facc15] leading-none">Validator Profile</h3>
+                <p className="text-[8px] text-white/45 tracking-[0.25em] uppercase font-mono mt-1">India's sovereign node parameter card</p>
+              </div>
+
+              {/* EDIT DETAIL FIELDS FORM */}
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-3.5 text-left">
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8.5px] font-mono font-bold text-white/40 uppercase tracking-widest pl-1">First Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul"
+                      value={profileForm.firstName}
+                      onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8.5px] font-mono font-bold text-[#9ca3af] uppercase tracking-widest pl-1">Last Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Sharma"
+                      value={profileForm.lastName}
+                      onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8.5px] font-mono font-bold text-[#9ca3af] uppercase tracking-widest pl-1">Registered Email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="email@poki.in"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                    className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8.5px] font-mono font-bold text-[#9ca3af] uppercase tracking-widest pl-1 font-sans">Verification Mobile Node</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91..."
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8.5px] font-mono font-bold text-[#9ca3af] uppercase tracking-widest pl-1">Age</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="24"
+                      value={profileForm.age}
+                      onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })}
+                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8.5px] font-mono font-bold text-[#9ca3af] uppercase tracking-widest pl-1">Country</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="India"
+                      value={profileForm.country}
+                      onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
+                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-black font-extrabold py-2.5 rounded-xl text-[10px] uppercase tracking-widest cursor-pointer mt-1.5 transition-colors"
+                >
+                  Save Profile Settings
+                </button>
+              </form>
+
+              {/* SEPARATE LOGOUT BUTTON INSIDE PROFILE DETAIL SCREEN */}
+              <div className="border-t border-white/5 mt-4.5 pt-4">
+                <button
+                  id="profile-logout-action-trigger"
+                  onClick={() => { setProfileModalOpen(false); handleLogout(); }}
+                  className="w-full bg-red-500/10 hover:bg-red-500/15 border border-red-500/30 text-red-400 hover:text-red-300 font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest cursor-pointer transition-colors flex items-center justify-center gap-1.5 select-none"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
+                  Logout Secure Session
+                </button>
+              </div>
+
+            </motion.div>
+          </dialog>
+        )}
+      </AnimatePresence>
 
     </div>
   );

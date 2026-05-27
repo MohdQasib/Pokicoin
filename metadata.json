@@ -1,5 +1,5 @@
 {
-  "name": "Poki Koin Mining Hub",
+  "name": "Pokicoin",
   "description": "A modern, simulation-based virtual cryptocurrency mining application inspired by Pi Coin, complete with an interactive mining engine, secure wallet generator, live ledger explorer, mining security circles, and a synthetic KYC validator.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

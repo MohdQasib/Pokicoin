@@ -80,7 +80,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             </div>
 
             <p className="text-[8.5px] leading-relaxed text-white/30 text-center font-sans tracking-wide mt-5">
-              PokiNet automatically safeguards your virtual mining ledger assets. Standard network re-synchronization resolves 99.8% of local conflicts safely.
+              Pokicoin automatically safeguards your virtual mining ledger assets. Standard network re-synchronization resolves 99.8% of local conflicts safely.
             </p>
           </div>
         </div>
