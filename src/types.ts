@@ -28,6 +28,9 @@ export interface Transaction {
   timestamp: number;
   blockNumber: number;
   status: 'pending' | 'success' | 'failed';
+  type?: 'mining' | 'game_fee' | 'game_win' | 'conversion' | 'withdrawal';
+  description?: string;
+  metadata?: any;
 }
 
 export interface Block {

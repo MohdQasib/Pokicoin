@@ -82,7 +82,7 @@ export default function MiningHub({
 
   // INR Conversion Display
   const currentInrValue = useMemo(() => {
-    return (balance * 0.50).toLocaleString('en-IN', {
+    return (balance * 0.011).toLocaleString('en-IN', {
       maximumFractionDigits: 2,
       minimumFractionDigits: 2
     });
@@ -118,7 +118,9 @@ export default function MiningHub({
 
   useEffect(() => {
     if (!isTelemetryAdCooldown) {
-      setTelemetryAdCooldownRemaining('');
+      if (telemetryAdCooldownRemaining !== '') {
+        setTelemetryAdCooldownRemaining('');
+      }
       return;
     }
 
@@ -134,7 +136,7 @@ export default function MiningHub({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isTelemetryAdCooldown, lastTelemetryAdTime]);
+  }, [isTelemetryAdCooldown, lastTelemetryAdTime, telemetryAdCooldownRemaining]);
 
   const handleWatchTelemetryAd = () => {
     if (telemetryAdPlaying || isTelemetryAdCooldown) return;
@@ -167,22 +169,34 @@ export default function MiningHub({
   const consoleBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Fluctuating hardware stats
-  const [hashrate, setHashrate] = useState(14.85);
-  const [coreTemp, setCoreTemp] = useState(48.3);
+  const [hashrate, setHashrate] = useState(0);
+  const [coreTemp, setCoreTemp] = useState(46.2);
 
   useEffect(() => {
+    if (isMining) {
+      setHashrate(parseFloat((12.45 + Math.random() * 6.4).toFixed(2)));
+    } else {
+      setHashrate(0);
+    }
+
     const statsTimer = setInterval(() => {
       if (isMining) {
-        setHashrate(prev => parseFloat((14.5 + Math.random() * 1.8).toFixed(2)));
-        setCoreTemp(prev => parseFloat((47.0 + Math.random() * 3.5).toFixed(1)));
+        setHashrate(parseFloat((12.45 + Math.random() * 6.4).toFixed(2)));
       } else {
         setHashrate(0);
-        setCoreTemp(prev => Math.max(34.2, parseFloat((prev - 0.4).toFixed(1))));
       }
     }, 3000);
 
     return () => clearInterval(statsTimer);
   }, [isMining]);
+
+  // CPU core temperature fluctuation dynamically between 45.5°C and 47.2°C every 10 seconds
+  useEffect(() => {
+    const tempTimer = setInterval(() => {
+      setCoreTemp(parseFloat((45.5 + Math.random() * (47.2 - 45.5)).toFixed(1)));
+    }, 10000);
+    return () => clearInterval(tempTimer);
+  }, []);
 
   // Log streams simulator
   useEffect(() => {
@@ -226,7 +240,7 @@ export default function MiningHub({
   }, []);
 
   const referralLink = useMemo(() => {
-    return `${window.location.protocol}//${window.location.host}/join?ref=${userReferralCode}`;
+    return `https://minipokicoin.in/join?ref=${userReferralCode}`;
   }, [userReferralCode]);
 
   // --- REFERRALS & SIMPLIFIED TEAM SYSTEM ---
@@ -348,7 +362,7 @@ export default function MiningHub({
             
             {/* Real-Time Conversion Display into INR */}
             <div className="w-full border-t border-white/5 mt-3 pt-2.5 flex items-center justify-between text-[11px] font-medium text-white/50">
-              <span className="text-[9px] uppercase tracking-wider">INR exchange value (₹0.50 / POKI)</span>
+              <span className="text-[9px] uppercase tracking-wider">INR exchange value (1 POKI = ₹0.011)</span>
               <span className="text-amber-300 font-mono font-bold text-xs">₹ {currentInrValue} INR</span>
             </div>
           </div>
@@ -524,11 +538,11 @@ export default function MiningHub({
               <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors pointer-events-none"></div>
               
               <div className="flex items-center gap-3 relative z-10 text-left">
-                <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:rotate-12 transition-transform">
+                <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:rotate-12 transition-transform shrink-0">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>
-                <div>
-                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Lucky sPiner</h5>
+                <div className="flex flex-col justify-center">
+                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Network Raffle</h5>
                   <p className="text-[8.5px] text-white/45 font-medium leading-none mt-1">Spin the flat colorful prize wheel</p>
                 </div>
               </div>
@@ -542,7 +556,7 @@ export default function MiningHub({
               </span>
             </button>
 
-            {/* Row 2: Daily Singin */}
+            {/* Row 2: Daily SignIn */}
             <button
               onClick={() => setActiveEarningModal('daily')}
               className="w-full backdrop-blur-md bg-white/[0.03] border border-amber-500/10 hover:border-amber-400/50 rounded-2xl px-4.5 py-3.5 flex items-center justify-between transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer group shadow relative overflow-hidden select-none"
@@ -550,11 +564,11 @@ export default function MiningHub({
               <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors pointer-events-none"></div>
               
               <div className="flex items-center gap-3 relative z-10 text-left">
-                <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform shrink-0">
                   <Calendar className="w-4 h-4 text-amber-400" />
                 </div>
-                <div>
-                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Daily Singin</h5>
+                <div className="flex flex-col justify-center">
+                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Daily Sign-In</h5>
                   <p className="text-[8.5px] text-white/45 font-medium leading-none mt-1">Stamp consecutive check-in lines</p>
                 </div>
               </div>
@@ -576,10 +590,10 @@ export default function MiningHub({
               <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors pointer-events-none"></div>
               
               <div className="flex items-center gap-3 relative z-10 text-left">
-                <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform shrink-0">
                   <Ticket className="w-4 h-4 text-amber-400" />
                 </div>
-                <div>
+                <div className="flex flex-col justify-center">
                   <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Scratch Card</h5>
                   <p className="text-[8.5px] text-white/45 font-medium leading-none mt-1">Rub & swipe to scrape gold layers</p>
                 </div>
@@ -594,7 +608,7 @@ export default function MiningHub({
               </span>
             </button>
 
-            {/* Row 4: Watch Ads */}
+            {/* Row 4: Claim Node Rewards */}
             <button
               onClick={handleWatchTelemetryAd}
               disabled={telemetryAdPlaying || isTelemetryAdCooldown}
@@ -607,11 +621,11 @@ export default function MiningHub({
               <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
               
               <div className="flex items-center gap-3 relative z-10 text-left">
-                <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 flex items-center justify-center bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500 group-hover:scale-105 transition-transform shrink-0">
                   <Tv className="w-4 h-4 text-amber-400" />
                 </div>
-                <div>
-                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Watch Ads</h5>
+                <div className="flex flex-col justify-center">
+                  <h5 className="text-[12px] font-bold uppercase text-white tracking-wider font-sans group-hover:text-amber-400 transition-colors">Claim Node Rewards</h5>
                   <p className="text-[8.5px] text-white/45 font-medium leading-none mt-1">Get telemetry rewards (+1.50 POKI)</p>
                 </div>
               </div>
@@ -621,7 +635,7 @@ export default function MiningHub({
                   ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
                   : 'bg-white/5 text-white/30 border-white/5'
               }`}>
-                {isTelemetryAdCooldown ? telemetryAdCooldownRemaining : 'WATCH'}
+                {isTelemetryAdCooldown ? telemetryAdCooldownRemaining : 'CLAIM'}
               </span>
             </button>
 
@@ -720,80 +734,9 @@ export default function MiningHub({
             </button>
           </div>
 
-          {/* SIMPLIFIED INVITE INPUT FORM (REQUIREMENT 3) */}
-          <form onSubmit={handleAddNewMemberNode} className="bg-white/[0.02] border border-white/10 rounded-2xl p-4 mb-5">
-            <div className="text-[9px] text-[#facc15] font-black tracking-widest uppercase mb-3 font-sans">
-              Invite Friends Manually
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Enter Friends Name"
-                required
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                className="flex-1 bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400"
-              />
-              <button
-                type="submit"
-                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-black font-extrabold px-4 rounded-xl text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1 shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5 text-black" />
-                Add Node
-              </button>
-            </div>
-          </form>
 
-          {/* ===================== SIMPLIFIED TEAM PANEL (REQUIREMENT 3) ===================== */}
-          <div id="referred-team-section" className="space-y-4">
-            
-            {/* Direct Referred team */}
-            <div className="bg-[#090804] border border-white/10 rounded-2.5xl p-4">
-              <h4 className="text-[10px] font-extrabold uppercase text-white/60 tracking-wider mb-3 flex justify-between items-center border-b border-white/5 pb-2 font-mono">
-                <span>Mining Team ({directTeam.length})</span>
-                <span className="text-amber-400 font-bold">+{ (directTeam.filter(r => r.isActive).length * 0.005).toFixed(3) }/h</span>
-              </h4>
 
-              {directTeam.length === 0 ? (
-                <div className="text-[9px] text-white/30 h-16 flex items-center justify-center border border-dashed border-white/5 rounded-xl font-sans">
-                  No partners connected in team nodes yet
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2 max-h-56 overflow-y-auto no-scrollbar font-mono">
-                  {directTeam.map(member => (
-                    <div key={member.id} className="bg-white/[0.01] border border-white/5 p-2 rounded-xl flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 font-sans text-left">
-                        <div className={`w-1.5 h-1.5 rounded-full ${member.isActive ? 'bg-amber-400 animate-pulse' : 'bg-white/10'}`}></div>
-                        <span className="text-[11px] font-bold text-white/80">{member.name}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {!member.isActive ? (
-                          <button
-                            type="button"
-                            onClick={() => onPingMember(member.id)}
-                            className="text-[8px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider cursor-pointer font-sans border border-amber-500/20"
-                          >
-                            Ping Node
-                          </button>
-                        ) : (
-                          <span className="text-[8px] font-mono text-[#10b981] uppercase select-none font-bold bg-[#10b981]/10 px-1.5 py-0.5 rounded border border-[#10b981]/25">ONLINE</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => onRemoveMember(member.id)}
-                          className="text-white/20 hover:text-red-400 p-1 rounded hover:bg-white/5 cursor-pointer font-sans"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-          </div>
 
         </div>
 

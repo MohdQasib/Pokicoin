@@ -22,7 +22,12 @@ import {
   X,
   Check,
   Gift,
-  UserPlus
+  UserPlus,
+  Lock,
+  Copy,
+  Plus,
+  Phone,
+  Share2
 } from 'lucide-react';
 
 import { MiningTeamMember, WalletState, Transaction, Block, KYCDetails } from './types';
@@ -92,8 +97,10 @@ export default function App() {
   // --- STATE DECLARATIONS ---
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('vmc_mining_balance');
-    return saved ? parseFloat(saved) : 10.0;
+    return saved ? parseFloat(saved) : 0.0;
   });
+
+  const [copiedReferral, setCopiedReferral] = useState<boolean>(false);
 
   const [isMining, setIsMining] = useState<boolean>(() => {
     return localStorage.getItem('vmc_is_mining') === 'true';
@@ -186,15 +193,7 @@ export default function App() {
   }, [balance]);
 
   // --- FIREBASE AND AUTH CONNECTIONS ---
-  const [firebaseUser, setFirebaseUser] = useState<{ name: string; email: string; phone?: string; uid?: string } | null>(() => {
-    const savedName = localStorage.getItem('poki_user_name');
-    const savedEmail = localStorage.getItem('poki_user_email');
-    const savedUid = localStorage.getItem('poki_user_uid');
-    if (savedEmail && savedName) {
-      return { name: savedName, email: savedEmail, uid: savedUid || 'guest_user' };
-    }
-    return null;
-  });
+  const [firebaseUser, setFirebaseUser] = useState<{ name: string; email: string; phone?: string; uid?: string } | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   // --- USER PROFILE AND LOCAL CARD DATA ---
@@ -327,20 +326,28 @@ export default function App() {
         localStorage.setItem('poki_user_email', email);
         localStorage.setItem('poki_user_uid', user.uid);
       } else {
-        setFirebaseUser(null);
-        localStorage.removeItem('poki_user_logged');
-        localStorage.removeItem('poki_user_name');
-        localStorage.removeItem('poki_user_email');
-        localStorage.removeItem('poki_user_uid');
+        const currentSavedUid = localStorage.getItem('poki_user_uid');
+        if (currentSavedUid === 'offline_local_sandbox_miner') {
+          // Keep offline sandbox session intact
+          const savedName = localStorage.getItem('poki_user_name') || 'Sandbox Miner';
+          const savedEmail = localStorage.getItem('poki_user_email') || 'sandbox@pokicoin.in';
+          setFirebaseUser({ name: savedName, email: savedEmail, uid: currentSavedUid });
+        } else {
+          setFirebaseUser(null);
+          localStorage.removeItem('poki_user_logged');
+          localStorage.removeItem('poki_user_name');
+          localStorage.removeItem('poki_user_email');
+          localStorage.removeItem('poki_user_uid');
+        }
       }
       setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Sync state values back to Firebase Realtime DB
+  // Sync state values back to Firebase Realtime DB (only if explicitly authenticated & UID matches)
   useEffect(() => {
-    if (firebaseUser?.uid && rtdb) {
+    if (firebaseUser?.uid && firebaseUser.uid !== 'offline_local_sandbox_miner' && rtdb && auth?.currentUser && auth.currentUser.uid === firebaseUser.uid) {
       const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
       const timer = setTimeout(() => {
         update(userRef, {
@@ -598,6 +605,68 @@ export default function App() {
     return { success: true, tx: newTx };
   };
 
+  const handleRequestWithdrawal = (method: string, address: string, amountPoki: number, amountINR: number) => {
+    if (amountPoki > walletState.migratedBalance) {
+      return { success: false, error: 'Insufficient balance in verified wallet container' };
+    }
+
+    const txId = 'tx_wd_' + Math.random().toString(36).substring(2, 9);
+    const newTx: Transaction = {
+      id: txId,
+      sender: walletState.publicKey,
+      recipient: `WITHDRAWAL-${method.toUpperCase()}`,
+      amount: amountPoki,
+      fee: 0.0,
+      timestamp: Date.now(),
+      blockNumber: blocks[0]?.number || 489311,
+      status: 'pending',
+      type: 'withdrawal',
+      description: `INR Redemption via ${method.toUpperCase()}`,
+      metadata: {
+        destination: address,
+        amountINR: amountINR,
+        payoutSchedule: 'Pending processing'
+      }
+    };
+
+    // Deduct migrated balance
+    setWalletState(prev => {
+      const updated = {
+        ...prev,
+        migratedBalance: Math.max(0, prev.migratedBalance - amountPoki)
+      };
+      localStorage.setItem('vmc_wallet_state', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Save transaction
+    const newTxs = [newTx, ...transactions];
+    setTransactions(newTxs);
+    localStorage.setItem('vmc_address_txs', JSON.stringify(newTxs));
+
+    // Save to Realtime Database under withdrawals list (only if authenticated)
+    if (firebaseUser?.uid && firebaseUser.uid !== 'offline_local_sandbox_miner' && rtdb && auth?.currentUser && auth.currentUser.uid === firebaseUser.uid) {
+      try {
+        const userRef = ref(rtdb, `users/${firebaseUser.uid}/withdrawals/${txId}`);
+        update(userRef, {
+          txId,
+          method,
+          destination: address,
+          amountPoki,
+          amountINR,
+          timestamp: Date.now(),
+          status: 'pending'
+        }).catch(err => {
+          console.warn("RTDB withdrawal write bypassed:", err);
+        });
+      } catch (e) {
+        console.warn("RTDB write warning on withdrawal:", e);
+      }
+    }
+
+    return { success: true, tx: newTx };
+  };
+
   const handleKycSubmit = (fullName: string, country: string, docType: KYCDetails['documentType'], docNum: string, selfieUrl?: string) => {
     setKycDetails({
       fullName,
@@ -731,9 +800,9 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-sm font-[900] tracking-wider uppercase text-white leading-none">
-                POKI<span className="text-amber-500">COIN</span>
+                POKI <span className="text-amber-500">COIN</span>
               </h1>
-              <span className="text-[7.5px] font-mono tracking-widest text-white/40 uppercase leading-none block mt-1">Concentric Quorum</span>
+              <span className="text-[7.5px] font-mono tracking-widest text-[#f59e0b] uppercase leading-none block mt-1">India's Leading Virtual Mining Network</span>
             </div>
           </div>
 
@@ -802,207 +871,271 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="flex-1"
               >
-                <GamePortal
-                  balance={balance}
-                  walletState={walletState}
-                  onRewardAwarded={handleGameRewardAwarded}
-                />
+                <GamePortal />
               </motion.div>
             )}
 
             {/* TAB 3: MORE EARNING (SURVEYS & TASKS MODULE) */}
-            {activeTab === 'earning' && (
-              <motion.div
-                key="tab-earning"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex-1 p-5 md:p-6"
-              >
-                <div className="flex flex-col gap-5">
-                  {/* Beautiful Title Segment */}
-                  <div className="border-b border-white/10 pb-3">
-                    <h3 className="text-base font-bold uppercase tracking-widest text-[#facc15]">More Earning Portal</h3>
-                    <p className="text-[9.5px] uppercase tracking-wider text-white/40 mt-1">Boost Miner Hashpower by Completing sponsored Tasks & Surveys</p>
-                  </div>
+            {activeTab === 'earning' && (() => {
+              const userReferralCode = firebaseUser?.email ? (firebaseUser.email.split('@')[0].toUpperCase() + "-POKI") : "POKI-MINER-7";
+              const referralLink = `https://minipokicoin.in?ref=${userReferralCode}`;
+              const activeTeam = teamMembers.filter(m => m.role === 'Invitee');
+              const activeCount = teamMembers.filter(m => m.isActive && m.role === 'Invitee').length;
 
-                  {/* Daily Mission - Recruit 5 New Nodes */}
-                  <div className="bg-[#100d07] border border-amber-500/20 rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_30px_rgba(245,158,11,0.03)]">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 blur-2xl rounded-full translate-x-1/3 -translate-y-1/3"></div>
-                    
-                    <div className="flex items-center justify-between mb-4.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500">
-                          <Gift className="w-4 h-4 animate-bounce" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[8px] font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-500/30 text-amber-400 px-2 py-0.5 rounded-full">ACTIVE DAILY MISSION</span>
-                          </div>
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider mt-0.5">Dual-Consensus Recruiter</h4>
-                        </div>
+              const handleShareWhatsApp = () => {
+                const text = `Join my elite Pokicoin Mining Team! Start mining Pokicoin on your phone and earn passive digital rewards. My referral code: ${userReferralCode}. Claim your ledger allocation here: ${referralLink}`;
+                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+              };
+
+              const handleShareSMS = () => {
+                const text = `Join my Poki network! Code: ${userReferralCode}. Link: ${referralLink}`;
+                window.open(`sms:?body=${encodeURIComponent(text)}`);
+              };
+
+              const handleShareNavigator = () => {
+                const text = `Mine Pokicoins with me! Start your core cloud validator node today. Code: ${userReferralCode}.`;
+                if (navigator.share) {
+                  navigator.share({
+                    title: 'Poki Virtual Miner Invitation',
+                    text: text,
+                    url: referralLink,
+                  }).catch(err => console.log(err));
+                } else {
+                  navigator.clipboard.writeText(referralLink);
+                  alert("📋 Referral link copied to clipboard successfully!");
+                }
+              };
+
+              const handleCopyAction = () => {
+                navigator.clipboard.writeText(referralLink);
+                setCopiedReferral(true);
+                setTimeout(() => setCopiedReferral(false), 2000);
+              };
+
+              return (
+                <motion.div
+                  key="tab-earning"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex-1 p-5 md:p-6"
+                >
+                  <div className="flex flex-col gap-5">
+                    {/* Beautiful Title Segment */}
+                    <div className="border-b border-white/10 pb-3">
+                      <h3 className="text-base font-bold uppercase tracking-widest text-[#facc15]">Earn & Refer Pool</h3>
+                      <p className="text-[10px] uppercase tracking-wider text-white/40 mt-1">Acquire rewards via sponsor surveys and dynamic mining team references</p>
+                    </div>
+
+                    {/* D. DAILY SURVEY COMING SOON BLOCK */}
+                    <div className="bg-[#100d07] border border-amber-500/15 rounded-3xl p-6 relative overflow-hidden text-center flex flex-col items-center justify-center py-9 shadow-inner select-none">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 blur-2xl rounded-full translate-x-1/3 -translate-y-1/3"></div>
+                      
+                      <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mb-3 animate-pulse">
+                        <Lock className="w-5 h-5" />
                       </div>
                       
-                      <div className="text-right">
-                        <span className="text-[9.5px] font-mono font-extrabold text-[#facc15] bg-[#fac515]/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner">+25.0 POKI</span>
+                      <span className="text-[8px] font-mono font-bold tracking-[0.2em] bg-amber-500/20 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full mb-2">
+                        DAILY SURVEYS FEED
+                      </span>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Survey Campaigns & Polls</h4>
+                      <p className="text-[10px] text-white/50 max-w-xs mt-1 leading-relaxed">
+                        Complete research campaigns to multiply mining hashpower. Currently locked pending integration.
+                      </p>
+                      
+                      <div className="mt-4 flex items-center gap-1.5 bg-[#0a0803] border border-white/5 py-1 px-3 rounded-full text-[9px] font-mono text-white/30 tracking-wider">
+                        <span>Status: LOCK (Coming Soon)</span>
                       </div>
                     </div>
 
-                    <p className="text-[10px] text-white/60 leading-relaxed max-w-md">
-                      Invite <strong className="text-white">5 new validator nodes</strong> to establish a larger peer network. Both invitees and the local operator get massive ledger allocations.
-                    </p>
-
-                    {/* Progress Segment */}
-                    <div className="mt-4 bg-[#14110b]/80 border border-white/[0.03] rounded-2xl p-3.5">
-                      <div className="flex items-center justify-between text-[10px] font-mono mb-2">
-                        <span className="text-white/40 uppercase font-bold text-[8.5px] tracking-wider">Recruitment Progress</span>
-                        <span className="text-amber-400 font-extrabold">{referralCount} / 5 Nodes Invited</span>
-                      </div>
-                      
-                      {/* Real Progress Bar */}
-                      <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 rounded-full transition-all duration-500"
-                          style={{ width: `${(referralCount / 5) * 100}%` }}
-                        ></div>
-                      </div>
-
-                      {/* Micro inline action to recruit a member instantly */}
-                      {referralCount < 5 && !isMissionClaimed && (
-                        <form 
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const target = e.target as HTMLFormElement;
-                            const input = target.elements.namedItem('nodeName') as HTMLInputElement;
-                            const newName = input.value.trim();
-                            if (newName) {
-                              handleAddMember(newName, false);
-                              input.value = '';
-                            }
-                          }}
-                          className="mt-3.5 flex gap-2"
-                        >
-                          <input 
-                            name="nodeName"
-                            type="text" 
-                            required
-                            placeholder="Enter friend's miner alias..."
-                            className="bg-black/40 border border-white/5 hover:border-white/10 focus:border-amber-500/40 text-[9.5px] text-white placeholder-white/30 px-3 py-2 rounded-xl flex-1 focus:outline-none transition-all font-sans leading-relaxed"
-                          />
-                          <button 
-                            type="submit"
-                            className="bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-wider px-4 py-2 rounded-xl transition-all cursor-pointer select-none active:scale-95"
-                          >
-                            🚀 INVITE NODE
-                          </button>
-                        </form>
-                      )}
-
-                      {/* Claim reward panel */}
-                      <div className="mt-3.5 flex items-center justify-between border-t border-white/[0.04] pt-3.5">
-                        <div className="text-[9px] text-white/40">
-                          {isMissionClaimed 
-                            ? "✓ Reward of 25.0 POKI successfully claimed today."
-                            : referralCount >= 5 
-                            ? "🎉 Mission completed! Core networks synchronized." 
-                            : "Add more validator peers to verify consensus."}
+                    {/* REFERRAL SYSTEM HEADER STATS CARD */}
+                    <div className="grid grid-cols-2 gap-3.5 mt-1">
+                      <div className="bg-[#120f09]/50 border border-amber-500/10 rounded-2xl p-4 flex flex-col justify-between">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-white/45">Team Count</span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className="text-xl font-extrabold text-white font-mono">{activeTeam.length}</span>
+                          <span className="text-[9.5px] text-white/45 font-mono">Peers</span>
                         </div>
-                        
-                        {isMissionClaimed ? (
-                          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 tracking-wider text-[8.5px] font-mono font-bold px-3.5 py-1.5 rounded-xl uppercase">
-                            <Check className="w-3 h-3 shrink-0" />
-                            Claimed
+                        <p className="text-[8.5px] text-white/30 uppercase mt-2">Active level multipliers</p>
+                      </div>
+
+                      <div className="bg-[#120f09]/50 border border-amber-500/10 rounded-2xl p-4 flex flex-col justify-between">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-white/45">Sync Rate</span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                          <span className="text-xl font-extrabold text-emerald-400 font-mono">{activeCount}</span>
+                          <span className="text-[9.5px] text-white/35 font-mono">/ {activeTeam.length} Live</span>
+                        </div>
+                        <p className="text-[8.5px] text-[#34d399]/70 uppercase mt-2">Core node hash boosts</p>
+                      </div>
+                    </div>
+
+                    {/* COPY & SOCIAL SHARE CONTROLS COMPONENT */}
+                    <div className="bg-[#0b0904] border border-amber-500/20 rounded-3xl p-5 select-none text-left flex flex-col gap-4">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-amber-500 tracking-wider">Poki Recruitment Console</h4>
+                        <p className="text-[9.5px] text-white/40 uppercase tracking-widest mt-0.5 leading-none">Register peers to earn permanent bonus allocations</p>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        {/* Interactive referral code viewer with Copy button */}
+                        <div className="flex flex-col gap-1.5 bg-black/45 border border-white/5 rounded-2xl p-3.5">
+                          <div className="flex justify-between items-center text-[8px] font-mono uppercase text-white/40 font-bold mb-1">
+                            <span>Your Custom Referral Link</span>
+                            <span className="text-amber-400 font-extrabold">{userReferralCode}</span>
                           </div>
-                        ) : (
+                          
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-black/60 border border-white/5 rounded-xl px-3 py-2.5 font-mono text-[9px] text-white/60 truncate select-all">
+                              {referralLink}
+                            </div>
+                            <button
+                              onClick={handleCopyAction}
+                              className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-bold cursor-pointer transition-colors active:scale-95 flex items-center justify-center shrink-0"
+                            >
+                              {copiedReferral ? (
+                                <span className="text-[9px] font-mono font-extrabold">Copied!</span>
+                              ) : (
+                                <Copy className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Interactive Social Media Shares Grid */}
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                          {/* WhatsApp Button */}
                           <button
-                            type="button"
-                            disabled={referralCount < 5}
-                            onClick={() => {
-                              // Claim reward!
-                              const bonusReward = 25.0;
-                              const updatedBal = balance + bonusReward;
-                              setBalance(updatedBal);
-                              localStorage.setItem('vmc_mining_balance', updatedBal.toString());
-                              
-                              if (firebaseUser?.uid && rtdb) {
-                                try {
-                                  const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
-                                  update(userRef, { balance: updatedBal });
-                                } catch (e) {
-                                  console.warn("RTDB balance sync during claim error:", e);
-                                }
-                              }
-                              
-                              localStorage.setItem('poki_daily_mission_claimed_date', new Date().toDateString());
-                              setIsMissionClaimed(true);
-                              alert("🎉 Daily Recruiter Mission Claimed! +25.0 POKI added directly to your mining pool.");
-                            }}
-                            className={`px-4 py-1.5 rounded-xl text-[9px] uppercase tracking-widest font-mono font-extrabold transition-all outline-none ${
-                              referralCount >= 5 
-                                ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-black shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:shadow-[0_0_20px_rgba(245,158,11,0.6)] cursor-pointer active:scale-95' 
-                                : 'bg-white/5 border border-white/5 text-white/30 cursor-not-allowed'
-                            }`}
+                            onClick={handleShareWhatsApp}
+                            className="py-3 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#25D366] font-bold text-[9px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
                           >
-                            🎁 Claim 25 POKI
+                            <Share2 className="w-4 h-4" />
+                            <span>WhatsApp</span>
                           </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Aesthetic Layout for Future Survey & Task Integrations */}
-                  <div className="bg-[#120f09]/40 border border-amber-500/10 rounded-3xl p-5 text-center flex flex-col items-center gap-3 py-8">
-                    <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mb-1">
-                      <Sparkles className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Survey & Task Engine Integration</h4>
-                    <p className="text-[10px] text-white/50 max-w-sm leading-relaxed">
-                      This earning module is specifically reserved for surveys, custom offerwalls, and monetization. Perfect for integrating external SDKs like Pollfish, Tapjoy, or custom Google Ad Exchange rewards.
-                    </p>
-                    <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-mono uppercase tracking-widest px-3.5 py-1.5 rounded-full mt-2">
-                      <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping"></span>
-                      Sandbox Ready: Dynamic SDK Hook Pending
-                    </div>
-                  </div>
+                          {/* SMS Button */}
+                          <button
+                            onClick={handleShareSMS}
+                            className="py-3 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 font-bold text-[9px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                          >
+                            <Phone className="w-4 h-4" />
+                            <span>SMS text</span>
+                          </button>
 
-                  {/* Illustrative Tasks Widgets matching Pokicoin theme */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[8px] font-mono tracking-widest text-amber-400 uppercase bg-amber-400/10 px-2 py-0.5 rounded">High Payout</span>
-                          <span className="text-[9.5px] text-amber-400 font-extrabold font-mono">+10.0 POKI</span>
+                          {/* Fallback Multi Share */}
+                          <button
+                            onClick={handleShareNavigator}
+                            className="py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-500 font-bold text-[9px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
+                          >
+                            <Users className="w-4 h-4" />
+                            <span>Other Share</span>
+                          </button>
                         </div>
-                        <h5 className="text-xs font-bold text-white uppercase tracking-wide">Sponsored Polls & Surveys</h5>
-                        <p className="text-[9.5px] text-white/40 mt-1 leading-normal">
-                          Give critical feedback on next-gen tech. Your survey responses direct funding directly to consensus pools.
-                        </p>
                       </div>
-                      <button disabled className="mt-4 w-full bg-white/5 border border-white/10 text-white/40 text-[9px] uppercase tracking-wider font-mono py-2 rounded-xl cursor-not-allowed">
-                        Integrate Poll/Survey SDK Here
-                      </button>
                     </div>
 
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[8px] font-mono tracking-widest text-emerald-400 uppercase bg-emerald-400/10 px-2 py-0.5 rounded">Direct Task</span>
-                          <span className="text-[9.5px] text-emerald-400 font-extrabold font-mono">+5.50 POKI</span>
+                    {/* MINING TEAM DIRECTORY LIST VIEWER */}
+                    <div className="bg-[#090804] border border-white/5 rounded-3xl p-5 text-left">
+                      <div className="flex items-center justify-between border-b border-white/[0.04] pb-3 mb-4">
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-white tracking-wide">Consensus Member Tree</h4>
+                          <p className="text-[9px] text-white/45 uppercase tracking-wider font-mono mt-0.5">Network Team members connected to your node</p>
                         </div>
-                        <h5 className="text-xs font-bold text-white uppercase tracking-wide">Dynamic Social Retweets</h5>
-                        <p className="text-[9.5px] text-white/40 mt-1 leading-normal">
-                          Complete immediate Twitter/Telegram subscription verifications to instantly multiply daily mining gains.
-                        </p>
+                        <span className="text-[10px] font-mono font-bold bg-white/5 px-2.5 py-0.5 rounded text-white/60">
+                          {activeTeam.length} Nodes
+                        </span>
                       </div>
-                      <button disabled className="mt-4 w-full bg-white/5 border border-white/10 text-white/40 text-[9px] uppercase tracking-wider font-mono py-2 rounded-xl cursor-not-allowed">
-                        Integrate Task Auth Check
-                      </button>
+
+                      {/* Add Custom Member Peer Directly Form */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const form = e.target as HTMLFormElement;
+                          const input = form.elements.namedItem('referredName') as HTMLInputElement;
+                          const nodeVal = input.value.trim();
+                          if (nodeVal) {
+                            handleAddMember(nodeVal, false);
+                            input.value = '';
+                            alert(`👥 Dynamic peer node "${nodeVal}" successfully provisioned and synchronized!`);
+                          }
+                        }}
+                        className="flex gap-2 mb-4 bg-white/[0.02] border border-white/10 rounded-2xl p-2.5"
+                      >
+                        <input
+                          name="referredName"
+                          type="text"
+                          required
+                          placeholder="Manually deploy referred miner peer alias..."
+                          className="flex-1 bg-black/60 border border-white/5 hover:border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder-white/20 focus:outline-none focus:border-amber-500 transition-all font-sans"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-3.5 rounded-xl text-[9px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add</span>
+                        </button>
+                      </form>
+
+                      {/* Mining Team Members List Display */}
+                      {activeTeam.length === 0 ? (
+                        <div className="text-center py-6 text-white/30 uppercase text-[9.5px] tracking-wider font-mono">
+                          No referred nodes found. Synchronize your team by copying and sharing your invitation link above!
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3.5">
+                          {activeTeam.map((member) => (
+                            <div
+                              key={member.id}
+                              className="bg-black/45 border border-white/5 rounded-2xl p-3 flex items-center justify-between shadow-sm transition-all hover:border-white/10"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* Profile avatar */}
+                                <div className={`w-8.5 h-8.5 rounded-xl font-bold text-xs uppercase flex items-center justify-center shrink-0 ${member.avatarColor}`}>
+                                  {member.name.substring(0, 2)}
+                                </div>
+                                <div className="flex flex-col">
+                                  <h5 className="text-[11.5px] font-extrabold text-[#fcfdfa]">{member.name}</h5>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[8.5px] font-mono text-white/40 uppercase tracking-wide bg-white/5 px-2 py-0.5 rounded">
+                                      {member.role === 'Security' ? 'Security Core' : 'Invitee Node'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right flex flex-col items-end gap-1 font-mono">
+                                {/* Status dot and contribution */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${member.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-400'}`}></span>
+                                  <span className={`text-[8.5px] uppercase font-bold tracking-wider ${member.isActive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {member.isActive ? 'Core Sync' : 'Idle Node'}
+                                  </span>
+                                </div>
+                                
+                                <span className="text-[9.5px] font-extrabold text-amber-500 font-mono">+{member.miningContribution * 1000} POKI/hr</span>
+
+                                {/* Dynamic ping button for inactive nodes */}
+                                {!member.isActive && (
+                                  <button
+                                    onClick={() => {
+                                      handlePingMember(member.id);
+                                      alert(`🔔 Core sync warning dispatched to ${member.name}! Dynamic consensus stream established.`);
+                                    }}
+                                    className="text-[8.5px] bg-[#fb7185]/10 hover:bg-[#fb7185]/20 border border-[#fb7185]/35 text-[#fb7185] px-2.5 py-0.5 rounded-lg font-bold uppercase transition-all tracking-wider font-mono cursor-pointer scale-90"
+                                  >
+                                    Ping peer
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                </div>
-              </motion.div>
-            )}
+                </motion.div>
+              );
+            })()}
 
             {/* TAB 4: WALLET & INR MATRIX */}
             {activeTab === 'wallet' && (
@@ -1024,23 +1157,10 @@ export default function App() {
                   transactions={transactions}
                   teamMembers={teamMembers}
                   balance={balance}
+                  onWithdraw={handleRequestWithdrawal}
                 />
 
-                {/* Integration of KYC submission portal right beside wallet for core balance migration */}
-                <div className="px-6 pb-6 mt-4">
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
-                      <div className="text-xs font-bold uppercase tracking-wider text-amber-500">KYC Validation Engine</div>
-                      <span className="text-[8px] font-mono bg-white/5 px-2 py-0.5 rounded text-white/45 uppercase">Identity lock</span>
-                    </div>
-                    
-                    <KycPortal
-                      kycDetails={kycDetails}
-                      onKycSubmit={handleKycSubmit}
-                      onKycApprove={handleKycApprove}
-                    />
-                  </div>
-                </div>
+
               </motion.div>
             )}
 
@@ -1138,19 +1258,7 @@ export default function App() {
 
                     </div>
 
-                    {/* Telemetry settings reset */}
-                    <div className="bg-[#120f09]/60 border border-amber-500/10 rounded-2xl p-4 flex justify-between items-center mt-6">
-                      <div className="text-[9.5px] text-white/30 font-mono uppercase tracking-wider pl-1 font-semibold leading-relaxed">
-                        <p className="text-amber-400/90 font-bold">Node persistence console</p>
-                        <p className="mt-0.5">₹ 1 POKI = ₹0.50 INR ledger parity</p>
-                      </div>
-                      <button
-                        onClick={handleClearPersistence}
-                        className="text-[9.5px] font-bold tracking-widest font-mono bg-red-400/10 hover:bg-red-400/20 border border-red-400/25 text-red-500 px-3.5 py-1.5 rounded-xl cursor-pointer transition-colors uppercase"
-                      >
-                        Clear State
-                      </button>
-                    </div>
+
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
@@ -1228,7 +1336,7 @@ export default function App() {
                           Pokicoin represents India's leading lightweight virtual server mining quorum, allowing normal consumer smartphones to participate safely in decentralised ledger validations without heating chips or wasting lithium batteries.
                         </p>
                         <p className="text-xs text-white/65 leading-relaxed font-sans pl-1">
-                          By linking dynamic security circles and mining quorums, users confirm transaction blocks directly in background micro-threads. Under cryptographic INR parities, 1 POKI establishes a solid consensus equivalent of exactly ₹0.50 INR.
+                          By linking dynamic security circles and mining quorums, users confirm transaction blocks directly in background micro-threads. Under cryptographic INR parities, 1 POKI establishes a solid consensus equivalent of exactly ₹0.011 INR.
                         </p>
 
                         <div className="grid grid-cols-2 gap-3 mt-2 text-center text-xs font-mono">
@@ -1280,134 +1388,7 @@ export default function App() {
           </AnimatePresence>
         </div>
 
-        {/* DEVELOPER/TESTER SYSTEM TELEMETRY CONTROLLER PANEL */}
-        {(firebaseUser?.email?.toLowerCase() === 'uu104015@gmail.com' || localStorage.getItem('poki_is_admin') === 'true') && (
-          <div className="fixed bottom-[74px] sm:bottom-[78px] left-0 right-0 z-30 w-full max-w-xl mx-auto px-4 pointer-events-none select-none">
-            <div className="bg-[#0b0802]/95 border border-amber-500/40 rounded-2xl p-3 shadow-[0_0_20px_rgba(245,158,11,0.3)] font-mono pointer-events-auto flex flex-col gap-2 backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-white/[0.05] pb-1.5">
-                <div className="flex items-center gap-1.5 text-amber-400 font-extrabold text-[9.5px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                  ADMIN SYSTEM TELEMETRY
-                </div>
-                <div className="text-[7.5px] text-white/50 uppercase tracking-widest font-bold">uu104015@gmail.com (Tester Account)</div>
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('poki_spin_count_today', '0');
-                    localStorage.setItem('poki_spin_date', new Date().toDateString());
-                    window.dispatchEvent(new Event('storage'));
-                    alert("🔄 Wheel spins reset! You have 3/3 daily spins available.");
-                  }}
-                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  ♻️ Wheel
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('poki_scratch_count_today', '0');
-                    localStorage.setItem('poki_scratch_date', new Date().toDateString());
-                    window.dispatchEvent(new Event('storage'));
-                    alert("🔄 Scratch cards reset! Cards are unlocked & scratchable.");
-                  }}
-                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  ♻️ Scratch
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.setItem('poki_streak_last_claim', '0');
-                    localStorage.setItem('poki_streak_claimed', '0');
-                    window.dispatchEvent(new Event('storage'));
-                    alert("🔄 Check-in resets! Progressive validations are claimable.");
-                  }}
-                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  ♻️ Check-In
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    localStorage.removeItem('poki_daily_mission_claimed_date');
-                    setIsMissionClaimed(false);
-                    window.dispatchEvent(new Event('storage'));
-                    alert("🔄 Invite Mission reset! Goal is now claimable on completion.");
-                  }}
-                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-400 text-amber-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  ♻️ Mission
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTeamMembers(DEFAULT_MEMBERS);
-                    localStorage.setItem('vmc_team_members', JSON.stringify(DEFAULT_MEMBERS));
-                    alert("👥 Network Team reset to default! Referral Progress is now 0/5.");
-                  }}
-                  className="bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 hover:border-yellow-400 text-yellow-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  👥 Reset Team
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const bonus = 500;
-                    const newBal = balance + bonus;
-                    setBalance(newBal);
-                    localStorage.setItem('vmc_mining_balance', newBal.toString());
-                    if (firebaseUser?.uid && rtdb) {
-                      try {
-                        const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
-                        update(userRef, { balance: newBal });
-                      } catch (e) {
-                        console.warn("RTDB sync error on admin inject:", e);
-                      }
-                    }
-                    alert(`💰 Added +${bonus} POKI directly to balance ledger!`);
-                  }}
-                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-400 text-emerald-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px]"
-                >
-                  ➕ +500 POKI
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWalletState(prev => {
-                      const updated = {
-                        ...prev,
-                        transferableBalance: prev.transferableBalance + 1000
-                      };
-                      localStorage.setItem('vmc_wallet_state', JSON.stringify(updated));
-                      if (firebaseUser?.uid && rtdb) {
-                        try {
-                          const userRef = ref(rtdb, `users/${firebaseUser.uid}`);
-                          update(userRef, { transferableBalance: updated.transferableBalance });
-                        } catch (e) {
-                          console.warn("RTDB transferable sync error:", e);
-                        }
-                      }
-                      return updated;
-                    });
-                    alert("💎 Gained +1000 POKI Transferable Balance!");
-                  }}
-                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-400 text-emerald-300 py-1.5 px-2 rounded-lg font-bold transition-all text-center cursor-pointer text-[8px] col-span-2 md:col-span-1"
-                >
-                  💎 +1k Trans
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* BOTTOM NAVIGATION FIXED BAR */}
         <nav className="fixed bottom-0 left-0 right-0 z-30 w-full bg-[#0a0802] border-t border-white/[0.04] backdrop-blur-2xl py-3.5 shadow-2xl shrink-0 select-none">
@@ -1428,13 +1409,17 @@ export default function App() {
             {/* 2. GAME ARCADE */}
             <button
               id="bottom-tab-games"
-              onClick={() => { setActiveTab('games'); setMoreSubView('none'); }}
+              onClick={() => { 
+                window.open("https://pokicoin-runner-482786697335.asia-southeast1.run.app", "_blank"); 
+                setActiveTab('games'); 
+                setMoreSubView('none'); 
+              }}
               className={`flex-1 flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 font-sans ${
                 activeTab === 'games' ? 'text-amber-400' : 'text-white/40 hover:text-white/80'
               }`}
             >
               <Gamepad2 className="w-4 h-4" />
-              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Arcade</span>
+              <span className="text-[7.5px] font-extrabold uppercase tracking-wider leading-none mt-1">Games</span>
             </button>
 
             {/* 3. MORE EARNING */}
@@ -1518,7 +1503,7 @@ export default function App() {
                       placeholder="e.g. Rahul"
                       value={profileForm.firstName}
                       onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
-                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                      className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -1529,7 +1514,7 @@ export default function App() {
                       placeholder="e.g. Sharma"
                       value={profileForm.lastName}
                       onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
-                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                      className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
                     />
                   </div>
                 </div>
@@ -1542,7 +1527,7 @@ export default function App() {
                     placeholder="email@poki.in"
                     value={profileForm.email}
                     onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                    className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
                   />
                 </div>
 
@@ -1554,7 +1539,7 @@ export default function App() {
                     placeholder="+91..."
                     value={profileForm.phone}
                     onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                    className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                    className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
                   />
                 </div>
 
@@ -1567,7 +1552,7 @@ export default function App() {
                       placeholder="24"
                       value={profileForm.age}
                       onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })}
-                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                      className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
                     />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -1578,7 +1563,7 @@ export default function App() {
                       placeholder="India"
                       value={profileForm.country}
                       onChange={(e) => setProfileForm({ ...profileForm, country: e.target.value })}
-                      className="bg-black/55 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
+                      className="bg-black/55 border border-white/10 rounded-xl pl-[12px] pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-sans"
                     />
                   </div>
                 </div>

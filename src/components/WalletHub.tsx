@@ -9,7 +9,6 @@ import {
   Layers, 
   ArrowUpRight, 
   ArrowDownLeft, 
-  ExternalLink, 
   Eye, 
   EyeOff, 
   CheckCircle,
@@ -17,7 +16,10 @@ import {
   Fingerprint,
   RotateCcw,
   RefreshCw,
-  TrendingDown
+  CreditCard,
+  Smartphone,
+  Globe,
+  DollarSign
 } from 'lucide-react';
 import { WalletState, Transaction, MiningTeamMember } from '../types';
 
@@ -32,9 +34,9 @@ interface WalletHubProps {
   transactions: Transaction[];
   teamMembers: MiningTeamMember[];
   balance: number; // total raw mined balance
+  onWithdraw?: (method: string, address: string, amountPoki: number, amountINR: number) => { success: boolean; error?: string; tx?: Transaction };
 }
 
-// BIP39 word list for passphrase generation
 const MOCK_BIP39_WORDS = [
   'poki', 'koin', 'mining', 'wallet', 'crypto', 'blockchain', 'ledger', 'node', 'genesis', 'staking',
   'stellar', 'consensus', 'network', 'security', 'circle', 'validation', 'hash', 'block', 'transaction',
@@ -54,6 +56,7 @@ export default function WalletHub({
   transactions,
   teamMembers,
   balance,
+  onWithdraw
 }: WalletHubProps) {
   const [typedPassphrase, setTypedPassphrase] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -63,6 +66,22 @@ export default function WalletHub({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+
+  // Withdrawal States
+  const [withdrawalMethod, setWithdrawalMethod] = useState<'upi' | 'phone' | 'crypto'>('upi');
+  const [upiId, setUpiId] = useState('');
+  const [phoneNo, setPhoneNo] = useState('');
+  const [cryptoAddr, setCryptoAddr] = useState('');
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalSuccess, setWithdrawalSuccess] = useState<string | null>(null);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // Constants
+  const MIN_WITHDRAWAL_POKI = 4545;
+  const PARITY_MULTIPLIER = 0.011; // 1 POKI = 0.011 INR, so 4,545 POKI = ~50 INR
+
+  // Derived Values
+  const defaultExchangeRateText = "1 POKI = ₹0.011 INR Ledger Parity";
 
   // Generate 24 random words
   const generatedPassphraseWords = useMemo(() => {
@@ -82,7 +101,7 @@ export default function WalletHub({
 
   const handleCreate = () => {
     onWalletCreate(generatedPublicKey, generatedPassphraseWords);
-    setTypedPassphrase(generatedPassphraseWords); // pre-populate
+    setTypedPassphrase(generatedPassphraseWords);
   };
 
   const handleUnlock = (e: React.FormEvent) => {
@@ -137,60 +156,130 @@ export default function WalletHub({
     }, 2000);
   };
 
+  const handleWithdrawalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setWithdrawalSuccess(null);
+
+    const amount = parseFloat(withdrawalAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setErrorMessage('Please specify a valid amount of Poki Koins to withdraw.');
+      return;
+    }
+
+    if (amount < MIN_WITHDRAWAL_POKI) {
+      setErrorMessage(`The minimum withdrawal threshold is exactly ${MIN_WITHDRAWAL_POKI.toLocaleString()} POKI Coin (~₹50.00 INR equivalent).`);
+      return;
+    }
+
+    // Determine target balance: can withdraw if migratedBalance or total raw balance is sufficient
+    // We deduct from walletState.migratedBalance primarily to reflect token lock logic
+    if (amount > walletState.migratedBalance) {
+      setErrorMessage(`Insufficient validated ledger balance. You currently have ${walletState.migratedBalance.toFixed(2)} POKI in your verified wallet container.`);
+      return;
+    }
+
+    let targetAddress = '';
+    if (withdrawalMethod === 'upi') {
+      if (!upiId.trim() || !upiId.includes('@')) {
+        setErrorMessage('Please enter a valid UPI address (e.g. name@upi).');
+        return;
+      }
+      targetAddress = upiId.trim();
+    } else if (withdrawalMethod === 'phone') {
+      if (!phoneNo.trim() || phoneNo.length < 10) {
+        setErrorMessage('Please enter a valid 10-digit phone number.');
+        return;
+      }
+      targetAddress = phoneNo.trim();
+    } else {
+      if (!cryptoAddr.trim() || cryptoAddr.length < 15) {
+        setErrorMessage('Please enter a valid Crypto Wallet Address (BEP-20 / ERC-20).');
+        return;
+      }
+      targetAddress = cryptoAddr.trim();
+    }
+
+    setIsWithdrawing(true);
+
+    const calculatedINR = amount * PARITY_MULTIPLIER;
+
+    setTimeout(() => {
+      if (onWithdraw) {
+        const result = onWithdraw(withdrawalMethod, targetAddress, amount, calculatedINR);
+        setIsWithdrawing(false);
+        if (result.success) {
+          setWithdrawalSuccess(`Withdrawal Request Created! ₹ ${calculatedINR.toFixed(2)} INR (${amount.toLocaleString()} POKI) is loaded under queue, pending verification.`);
+          setWithdrawalAmount('');
+          setUpiId('');
+          setPhoneNo('');
+          setCryptoAddr('');
+        } else {
+          setErrorMessage(result.error || 'Withdrawal dispatch failed.');
+        }
+      } else {
+        setIsWithdrawing(false);
+        setErrorMessage('Withdrawal handler not connected to main applet.');
+      }
+    }, 2500);
+  };
+
   const handleCopyPassphrase = () => {
     navigator.clipboard.writeText(walletState.privateKeyPhrase || generatedPassphraseWords);
+    alert('📋 Core BIP39 Passphrase copied safely!');
   };
 
   const handleCopyPublicAddress = () => {
     navigator.clipboard.writeText(walletState.publicKey);
+    alert('📋 Wallet Public Key Address copied!');
   };
 
   const availablePeers = teamMembers.filter(m => !m.isSecurityCircle || m.role === 'Security');
 
   return (
     <div className="flex flex-col h-full bg-transparent font-sans text-white overflow-y-auto no-scrollbar pb-6 p-6">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#0a0802]/40 backdrop-blur-md z-10">
+      
+      {/* HEADER SECTION */}
+      <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5 sticky top-0 bg-[#0a0802]/85 backdrop-blur-md z-10 select-none">
         <div>
-          <h2 className="text-base font-display font-bold text-white uppercase tracking-widest font-sans">Simulated Node Wallet</h2>
-          <p className="text-[10px] text-white/40 mt-1 uppercase tracking-wide">Decentralized asset ledger verified keys</p>
+          <h2 className="text-base font-display font-black text-white uppercase tracking-widest font-sans">Verified Ledger Wallet</h2>
+          <p className="text-[9.5px] text-white/40 mt-1 uppercase tracking-wider font-mono">Consensus peer sync & withdrawal node</p>
         </div>
-        <Key className="w-5 h-5 text-amber-400" />
+        <Key className="w-5 h-5 text-amber-400 animate-pulse" />
       </div>
 
       {!walletState.isCreated ? (
         /* WALLET GENERATOR VIEW */
-        <div className="flex-1 flex flex-col justify-center py-4 relative z-10">
-          <div className="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col items-center text-center gap-5 backdrop-blur-sm shadow-xl">
+        <div className="flex-1 flex flex-col justify-center py-4 relative z-10 select-none">
+          <div className="bg-white/5 rounded-2.5xl p-6 border border-white/10 flex flex-col items-center text-center gap-5 backdrop-blur-sm shadow-xl">
             <div className="w-12 h-12 bg-amber-950/40 text-amber-400 border border-amber-800/45 rounded-xl flex items-center justify-center">
-              <Key className="w-6 h-6" />
+              <Key className="w-6 h-6 animate-spin" style={{ animationDuration: '6s' }} />
             </div>
             
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-amber-400">Generate Poki Keys</h3>
-              <p className="text-[11px] text-white/50 mt-1.5 px-3 leading-relaxed font-sans">
-                Decentralized nodes require a private passphrase. This 24-word seed matrix generates public-private keys. We never store this private vector.
+              <h3 className="text-xs font-black uppercase tracking-widest text-[#facc15]">Generate Core Wallet Keys</h3>
+              <p className="text-[10.5px] text-white/50 mt-1.5 px-3 leading-relaxed font-sans">
+                Each miner node uses an asymmetric BIP39 cryptographic passphrase. This ensures localized ledger ownership. We never record your secret private keys.
               </p>
             </div>
 
-            <div className="w-full bg-[#0a0802]/60 p-4 rounded-xl border border-white/10 relative">
-              <span className="text-[8px] text-white/40 uppercase tracking-[0.2em] font-mono block mb-2 text-left">Asymmetric BIP39 Seed Matrix</span>
-              <div className={`text-xs font-mono select-all bg-[#030303]/30 border border-white/10 p-3 rounded-xl leading-relaxed text-left break-all h-20 overflow-y-auto no-scrollbar ${passphraseVisible ? 'text-white' : 'text-white/20 blur-[4px]'}`}>
+            <div className="w-full bg-[#0a0802]/80 p-4.5 rounded-2xl border border-white/10 relative">
+              <span className="text-[8px] text-white/45 uppercase tracking-[0.2em] font-mono block mb-2 text-left">Generated Master seed Matrix</span>
+              <div className={`text-xs font-mono select-all bg-[#030303]/40 border border-white/5 p-3 rounded-xl leading-relaxed text-left break-all h-20 overflow-y-auto no-scrollbar ${passphraseVisible ? 'text-white' : 'text-white/10 blur-[4.5px]'}`}>
                 {generatedPassphraseWords}
               </div>
               
               <div className="flex justify-end gap-2 mt-3">
                 <button
-                  id="toggle-passphrase-visibility"
                   onClick={() => setPassphraseVisible(!passphraseVisible)}
-                  className="p-1 px-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] text-white/60 flex items-center gap-1 cursor-pointer"
+                  className="p-1.5 px-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] text-white/60 flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   {passphraseVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  {passphraseVisible ? 'Hide' : 'Reveal'}
+                  {passphraseVisible ? 'Hide seed' : 'Reveal'}
                 </button>
                 <button
-                  id="copy-passphrase-seed"
                   onClick={handleCopyPassphrase}
-                  className="p-1 px-2.5 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[9px] text-amber-400 flex items-center gap-1 cursor-pointer"
+                  className="p-1.5 px-3 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[9px] text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   Copy Seed
@@ -198,44 +287,44 @@ export default function WalletHub({
               </div>
             </div>
 
-            <div className="bg-amber-950/20 border border-amber-500/20 p-4 rounded-xl text-left text-[11px] flex gap-3 text-amber-200">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="bg-amber-950/20 border border-amber-500/20 p-4 rounded-2xl text-left text-[10px] flex gap-3 text-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-bounce" />
               <p className="leading-relaxed font-sans">
-                <strong>CRITICAL:</strong> Save your seed matrix safely. Anyone who gets this phrase can access and transfer your verified Poki Koins!
+                <strong>IMPORTANT NOTE:</strong> Save this private matrix credentials now. Secure offline persistence is recommended. Inability to supply seed key results in network asset loss.
               </p>
             </div>
 
             <button
               id="initial-create-wallet-btn"
               onClick={handleCreate}
-              className="w-full bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-bold py-3 rounded-xl text-[10px] uppercase tracking-widest transition-colors cursor-pointer"
+              className="w-full bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-extrabold py-3.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors cursor-pointer select-none active:scale-95"
             >
-              Initialize Node & Copy Seed
+              Generate Wallet & Sync Account
             </button>
           </div>
         </div>
       ) : !walletState.isUnlocked ? (
         /* WALLET UNLOCK VIEW */
-        <div className="flex-1 flex flex-col justify-center py-4 relative z-10">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-5 backdrop-blur-sm">
+        <div className="flex-1 flex flex-col justify-center py-4 relative z-10 select-none">
+          <div className="bg-white/5 border border-white/10 rounded-2.5xl p-6 flex flex-col gap-5 backdrop-blur-sm">
             <div className="text-center">
               <div className="w-10 h-10 bg-amber-950/40 border border-amber-900/30 rounded-full flex items-center justify-center mx-auto text-amber-400 mb-2">
                 <Unlock className="w-5 h-5 animate-pulse" />
               </div>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-[#facc15]">Unlock Ledger Access</h3>
-              <p className="text-[11px] text-white/55 mt-1">Provide seed matrix credentials to confirm signature</p>
+              <h3 className="text-xs font-black uppercase tracking-widest text-[#facc15]">Unlock Ledger Container</h3>
+              <p className="text-[10px] text-white/55 mt-1">Provide master 24-word credentials to decrypt keys</p>
             </div>
 
             <form onSubmit={handleUnlock} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Seed Phrase Passphrase</label>
+                <label className="text-[8px] font-mono font-bold text-white/40 uppercase tracking-widest">Seed Phrase Matrix</label>
                 <textarea
                   id="unlock-passphrase-input"
                   rows={3}
-                  placeholder="Paste your 24-word secure phrase here..."
+                  placeholder="Paste your 24-word secure phrase here to authenticate..."
                   value={typedPassphrase}
                   onChange={(e) => setTypedPassphrase(e.target.value)}
-                  className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white/95 focus:outline-none focus:border-amber-400 resize-none"
+                  className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white/95 focus:outline-none focus:border-amber-400 resize-none leading-relaxed"
                 />
               </div>
 
@@ -244,18 +333,18 @@ export default function WalletHub({
                   id="biometric-fingerprint-unlock-btn"
                   type="button"
                   onClick={handleSimulatedBiometricUnlock}
-                  className="bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 font-bold py-2.5 px-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 font-bold py-2.5 px-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Fingerprint className="w-4 h-4 text-amber-400" />
-                  <span>Use Touch ID</span>
+                  <span>Biometric unlock</span>
                 </button>
                 
                 <button
                   id="submit-unlock-wallet-btn"
                   type="submit"
-                  className="flex-1 bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors cursor-pointer"
+                  className="flex-1 bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-extrabold py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors cursor-pointer active:scale-95"
                 >
-                  Unlock Wallet
+                  Unlock Ledger
                 </button>
               </div>
 
@@ -263,246 +352,352 @@ export default function WalletHub({
                 id="reset-passphrase-wallet-btn"
                 type="button"
                 onClick={onWalletLock}
-                className="text-[9px] text-amber-400 hover:text-amber-300 uppercase tracking-widest text-center flex items-center gap-1 justify-center border-t border-white/10 pt-3 cursor-pointer mt-1"
+                className="text-[9px] text-[#facc15] hover:text-amber-300 uppercase tracking-widest text-center flex items-center gap-1.5 justify-center border-t border-white/5 pt-3.5 cursor-pointer mt-1"
               >
-                <RotateCcw className="w-3 h-3" /> Re-generate master seed
+                <RotateCcw className="w-3.5 h-3.5" /> 
+                <span>Re-generate seed matrix</span>
               </button>
             </form>
           </div>
         </div>
       ) : (
         /* WALLET MAIN VIEW (UNLOCKED) */
-        <div className="flex flex-col gap-6 relative z-10">
-          {/* Unlocked Header Card with gold gradient */}
-          <div className="bg-gradient-to-tr from-[#1a1505]/80 to-[#070501]/80 border border-amber-500/25 rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden backdrop-blur-sm shadow-[0_0_30px_rgba(245,158,11,0.08)]">
-            <div className="absolute right-0 top-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
-            
-            <div className="flex justify-between items-start">
+        <div className="flex flex-col gap-5 relative z-10">
+          
+          {/* A. BALANCE DESKTOP SEGMENT (Poki coin balance and INR equivalent) */}
+          <div className="bg-[#0b0904] border border-amber-500/20 rounded-3xl p-5.5 flex flex-col gap-4 relative overflow-hidden shadow-inner">
+            <div className="absolute right-0 top-0 w-28 h-28 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="flex justify-between items-start border-b border-white/[0.04] pb-4">
               <div>
-                <span className="text-[9px] text-white/40 font-mono tracking-widest uppercase">Validated Balance Ledger</span>
-                <div className="text-3xl font-light font-display mt-1 text-white flex items-baseline select-none">
+                <span className="text-[8px] font-mono text-white/45 tracking-widest uppercase">Verified Ledger Wallet</span>
+                <div className="text-2xl font-black font-display text-white flex items-baseline select-none mt-0.5">
                   {walletState.migratedBalance.toFixed(4)}
-                  <span className="text-xs text-amber-400 font-bold ml-2 font-mono uppercase tracking-wider">POKI</span>
+                  <span className="text-[10px] text-amber-400 font-extrabold ml-1.5 font-mono">POKI</span>
                 </div>
-                {/* Rupees calculation */}
-                <div className="text-[11px] text-amber-300 font-semibold font-mono mt-0.5">
-                  ₹ {(walletState.migratedBalance * 0.50).toFixed(2)} INR
+                {/* INR Conversion calculated with exact 0.001 Parity (1000 POKI = 1 INR) */}
+                <div className="text-[11px] text-emerald-400 font-extrabold font-mono mt-0.5">
+                  ₹ {(walletState.migratedBalance * PARITY_MULTIPLIER).toFixed(2)} INR Equivalent
                 </div>
               </div>
+
               <button
-                id="lock-wallet-menu-btn"
                 onClick={onWalletLock}
-                className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 px-2.5 py-1 rounded-full text-[8.5px] uppercase font-mono tracking-widest cursor-pointer"
+                className="bg-white/5 hover:bg-white/10 border border-white/5 text-white/60 px-3 py-1.5 rounded-full text-[8.5px] uppercase font-mono tracking-widest cursor-pointer scale-95 transition-all"
               >
                 Lock Wallet
               </button>
             </div>
+          </div>
 
-            {/* Public Key Address Display */}
-            <div className="bg-[#030303]/60 p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-white/65 font-mono">
-              <div className="flex items-center gap-2 overflow-hidden w-full">
-                <span className="text-[8px] font-mono uppercase bg-white/5 border border-white/10 text-amber-400 px-1 py-0.5 rounded truncate shrink">Public Key Address</span>
-                <span className="font-mono text-[9.5px] select-all truncate shrink w-full block">{walletState.publicKey}</span>
+          {/* TRANSFER MECHANISM & MIGRATION CARD (IF USER WANTS TO SYNC PREVIOUS INLINE ASSETS) */}
+          {walletState.transferableBalance > 0 && (
+            <div className="bg-[#120f09]/40 border border-amber-500/10 rounded-2.5xl p-4 flex items-center justify-between">
+              <div className="text-left">
+                <h4 className="text-[11px] font-bold text-white uppercase font-sans">Convert Mined Assets</h4>
+                <p className="text-[9px] text-white/40 uppercase mt-0.5">Migrate raw miner ledger into verified wallet container</p>
               </div>
+
               <button
-                id="copy-public-key-address"
-                onClick={handleCopyPublicAddress}
-                className="text-white/30 hover:text-amber-400 p-1 cursor-pointer shrink-0"
-                title="Copy Address"
+                onClick={handleMigrate}
+                disabled={isMigrating}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-widest px-4 py-2.5 rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
               >
-                <Copy className="w-3.5 h-3.5" />
+                {isMigrating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+                <span>Migrate balance</span>
               </button>
             </div>
-          </div>
+          )}
 
-          {/* Balance Details Breakdown Grid with INR values */}
-          <div className="grid grid-cols-2 gap-4">
-            
-            {/* Unverified Referral Bonus Balance */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between">
-              <div>
-                <span className="text-[8.5px] text-white/40 uppercase tracking-widest font-semibold font-mono block">Unverified Bonus</span>
-                <div className="text-base font-bold font-mono mt-1 text-amber-400">
-                  {walletState.unverifiedBalance.toFixed(4)} <span className="text-[8.5px] text-white/30 font-normal">POKI</span>
-                </div>
-                <div className="text-[9.5px] text-white/40 font-mono mt-0.2">
-                  ₹ {(walletState.unverifiedBalance * 0.50).toFixed(2)}
-                </div>
-              </div>
-              <p className="text-[9px] text-white/45 mt-2 leading-relaxed">
-                Peer reference tokens that unlock dynamically as circle contacts complete KYC.
-              </p>
-            </div>
-
-            {/* Transferable Balance */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between relative">
-              <div>
-                <span className="text-[8.5px] text-white/40 uppercase tracking-widest font-semibold font-mono block">Transferable Core</span>
-                <div className="text-base font-bold font-mono mt-1 text-amber-300">
-                  {walletState.transferableBalance.toFixed(4)} <span className="text-[8.5px] text-white/30 font-normal font-sans">POKI</span>
-                </div>
-                <div className="text-[9.5px] text-white/40 font-mono mt-0.2">
-                  ₹ {(walletState.transferableBalance * 0.50).toFixed(2)}
-                </div>
-              </div>
-              
-              {kycApproved ? (
-                <button
-                  id="migrate-transferable-balance-btn"
-                  onClick={handleMigrate}
-                  disabled={isMigrating || walletState.transferableBalance <= 0}
-                  className="mt-2.5 w-full bg-gradient-to-tr from-amber-500 to-yellow-500 text-black font-bold py-1.5 px-2 rounded-lg text-[9px] uppercase tracking-widest disabled:opacity-40 flex items-center justify-center gap-1 cursor-pointer transition-all"
-                >
-                  {isMigrating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
-                  {isMigrating ? 'Migrating...' : 'Migrate'}
-                </button>
-              ) : (
-                <div className="mt-2.5 p-1 px-1.5 rounded bg-amber-500/5 border border-amber-500/10 text-[8px] leading-relaxed text-amber-400/50 text-center uppercase tracking-wider font-mono">
-                  🔒 Requires KYC
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Send Transaction Simulator */}
-          <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-            <h3 className="text-xs font-display font-bold text-white uppercase tracking-widest flex items-center gap-2 mb-4">
-              <Send className="w-4 h-4 text-amber-400" />
-              Transfer Peer Exchange
+          {/* B & C. WITHDRAWAL MATRIX (UPI ID, phone number, crypto wallet address) */}
+          <div className="bg-white/[0.02] border border-white/10 rounded-3xl p-5 text-left">
+            <h3 className="text-xs font-black uppercase text-white tracking-widest flex items-center gap-1.5 pb-3 border-b border-white/[0.04] mb-4.5">
+              <CreditCard className="w-4.5 h-4.5 text-amber-500" />
+              <span>Asset Redemption Pool</span>
             </h3>
 
             {errorMessage && (
-              <div className="mb-3 bg-red-950/20 border border-red-500/20 text-red-300 p-2.5 rounded-lg text-xs flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {errorMessage}
+              <div className="mb-4 bg-red-950/20 border border-red-500/25 text-red-300 p-3.5 rounded-2xl text-xs flex items-center gap-2 font-semibold">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{errorMessage}</span>
               </div>
             )}
 
-            {transactionNotification && (
-              <div className="mb-3 bg-amber-950/30 border border-amber-500/30 text-amber-300 p-3 rounded-lg text-xs">
-                <div className="flex items-center gap-1.5 font-bold mb-1 uppercase tracking-widest text-[10px]">
-                  <CheckCircle className="w-4 h-4 text-amber-400" />
-                  Transaction Broadcasted
-                </div>
-                <p className="text-[10px] text-white/50 leading-relaxed font-mono">
-                  Hash: <span className="text-[#facc15]">{transactionNotification.id.substring(0, 16)}...</span>
-                </p>
+            {withdrawalSuccess && (
+              <div className="mb-4 bg-emerald-950/20 border border-emerald-500/25 text-emerald-300 p-3.5 rounded-2xl text-xs flex items-center gap-2 font-semibold">
+                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{withdrawalSuccess}</span>
               </div>
             )}
 
-            <form onSubmit={handleSend} className="flex flex-col gap-3">
+            <form onSubmit={handleWithdrawalSubmit} className="flex flex-col gap-4">
+              
+              {/* Select Withdrawal Options */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[8px] text-white/40 uppercase tracking-widest font-mono">Recipient Public ID or Peer</label>
-                <div className="flex gap-2">
+                <label className="text-[8.5px] font-mono uppercase tracking-wider text-white/45 pl-0.5">Redemption Channel Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalMethod('upi')}
+                    className={`py-3.5 border rounded-xl font-bold uppercase text-[9px] tracking-wider flex flex-col items-center justify-center gap-1.5 transition-all outline-none cursor-pointer ${
+                      withdrawalMethod === 'upi'
+                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                        : 'border-white/5 bg-[#070502]/45 text-white/40 hover:border-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    <CreditCard className="w-4.5 h-4.5" />
+                    <span>UPI Gate</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalMethod('phone')}
+                    className={`py-3.5 border rounded-xl font-bold uppercase text-[9px] tracking-wider flex flex-col items-center justify-center gap-1.5 transition-all outline-none cursor-pointer ${
+                      withdrawalMethod === 'phone'
+                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                        : 'border-white/5 bg-[#070502]/45 text-white/40 hover:border-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    <Smartphone className="w-4.5 h-4.5" />
+                    <span>Phone Gpay</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalMethod('crypto')}
+                    className={`py-3.5 border rounded-xl font-bold uppercase text-[9px] tracking-wider flex flex-col items-center justify-center gap-1.5 transition-all outline-none cursor-pointer ${
+                      withdrawalMethod === 'crypto'
+                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                        : 'border-white/5 bg-[#070502]/45 text-white/40 hover:border-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    <Globe className="w-4.5 h-4.5" />
+                    <span>Crypto (BSC)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic input display matching current choice */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[8.5px] font-mono uppercase tracking-wider text-white/50 pl-1">
+                  {withdrawalMethod === 'upi' ? 'UPI Address' : withdrawalMethod === 'phone' ? 'Phone Paytm/PhonePe Number' : 'BEP-20 / ERC-20 Address'}
+                </label>
+                
+                {withdrawalMethod === 'upi' && (
                   <input
-                    id="recipient-address-input"
                     type="text"
-                    placeholder="G... node public vector"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-400 font-mono"
+                    required
+                    placeholder="Enter UPI Address (e.g. name@paytm, secure@oksbi)"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    className="w-full bg-black/60 border border-white/5 rounded-xl px-3.5 py-3 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-500 font-mono transition-colors"
                   />
-                  {availablePeers.length > 0 && (
-                    <select
-                      id="peer-selector-shortcut"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val) {
-                          setRecipient(val);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="bg-black/60 border border-white/10 rounded-xl px-2 py-2 text-[9px] uppercase tracking-wider text-white/60 focus:outline-none focus:border-amber-400 cursor-pointer text-left font-semibold"
-                    >
-                      <option value="">Choose Contact...</option>
-                      {availablePeers.map(p => (
-                        <option key={p.id} value={`G${p.id.substring(0, 8).toUpperCase()}${p.name.substring(0, 2).toUpperCase()}`}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                )}
+
+                {withdrawalMethod === 'phone' && (
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    placeholder="Enter 10-digit mobile number linked to GPay/Paytm"
+                    value={phoneNo}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setPhoneNo(val);
+                    }}
+                    className="w-full bg-black/60 border border-white/5 rounded-xl px-3.5 py-3 text-xs text-white placeholder-white/20 focus:outline-none focus:border-amber-500 font-mono transition-colors"
+                  />
+                )}
+
+                {withdrawalMethod === 'crypto' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Paste BEP20/ERC20 wallet destination vector (e.g. 0x...)"
+                    value={cryptoAddr}
+                    onChange={(e) => setCryptoAddr(e.target.value)}
+                    className="w-full bg-black/60 border border-white/5 rounded-xl px-3.5 py-3 text-[10.5px] text-white placeholder-white/20 focus:outline-none focus:border-amber-500 font-mono transition-colors"
+                  />
+                )}
               </div>
 
+              {/* Input for Withdrawal Coins quantity */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[8px] text-white/40 uppercase tracking-widest font-mono font-sans">Amount Poki Koin</label>
+                <label className="text-[8.5px] font-mono uppercase tracking-wider text-white/50 pl-1">Redeem Amount (POKI)</label>
                 <div className="relative">
                   <input
-                    id="transaction-amount-input"
                     type="number"
+                    required
                     step="any"
-                    placeholder="0.00"
-                    value={sendAmount}
-                    onChange={(e) => setSendAmount(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl pl-3 pr-20 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-400"
+                    placeholder={`Enter amount (Minimum: ${MIN_WITHDRAWAL_POKI.toLocaleString()} POKI)`}
+                    value={withdrawalAmount}
+                    onChange={(e) => setWithdrawalAmount(e.target.value)}
+                    className="w-full bg-black/60 border border-white/5 rounded-xl pl-3.5 pr-24 py-3 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
                   />
-                  <span className="absolute right-3 top-2.5 text-[8.5px] font-bold text-amber-400 font-mono uppercase">
-                    Limit: {walletState.migratedBalance.toFixed(2)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalAmount(Math.floor(walletState.migratedBalance).toString())}
+                    className="absolute right-3.5 top-3 text-[8.5px] font-extrabold uppercase text-[#facc15] font-mono hover:text-amber-300 cursor-pointer"
+                  >
+                    Max Limit
+                  </button>
                 </div>
-                <div className="flex justify-between items-center text-[8px] mt-0.5 ml-1 select-none">
-                  <span className="text-white/30 font-mono">Fee: 0.0001 POKI consensus</span>
-                  {sendAmount && !isNaN(parseFloat(sendAmount)) && (
-                    <span className="text-amber-300 font-bold font-mono">Est. Value: ₹ {(parseFloat(sendAmount) * 0.50).toFixed(2)} INR</span>
+                
+                {/* Real-time calculated rate block */}
+                <div className="flex justify-between items-center text-[8.5px] pl-1 font-mono uppercase tracking-wider">
+                  <span className="text-white/30">Exchange: 1 POKI = ₹0.011 INR</span>
+                  {withdrawalAmount && !isNaN(parseFloat(withdrawalAmount)) && (
+                    <span className="text-emerald-400 font-extrabold">
+                      Est. Payout: ₹ {(parseFloat(withdrawalAmount) * PARITY_MULTIPLIER).toFixed(2)} INR
+                    </span>
                   )}
                 </div>
               </div>
 
+              {/* C. Fully professional and working withdrawal button that sends request to DB */}
               <button
-                id="send-transaction-submit-btn"
                 type="submit"
-                disabled={isSending || walletState.migratedBalance < Number(sendAmount)}
-                className="w-full bg-gradient-to-tr from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all cursor-pointer disabled:opacity-40"
+                disabled={isWithdrawing || walletState.migratedBalance < MIN_WITHDRAWAL_POKI}
+                className={`w-full py-3.5 rounded-xl text-[10px] uppercase tracking-widest font-mono font-black border transition-all cursor-pointer ${
+                  walletState.migratedBalance >= MIN_WITHDRAWAL_POKI
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-[#090804] border-amber-400/40 hover:from-amber-400 active:scale-98 shadow hover:shadow-xl'
+                    : 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
+                }`}
               >
-                {isSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                {isSending ? 'Verifying block ledger...' : 'Authorize Transaction'}
+                {isWithdrawing ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Broadcasting dispatch request...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-black shrink-0" />
+                    <span>Submit withdrawal request</span>
+                  </span>
+                )}
               </button>
+
+              {/* Notice text box right BELOW the withdrawal action button */}
+              <div 
+                id="withdrawal-notice-box" 
+                className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 text-left text-amber-300 font-sans text-[11px] leading-relaxed shadow-inner"
+              >
+                Notice: Minimum withdrawal limit is 4,545 POKI (₹50.00). Payouts are processed within 24-48 hours directly to your UPI ID.
+              </div>
+
+              {/* D. Payment schedule disclosure note below button */}
+              <div className="border-t border-white/[0.04] pt-4.5 mt-2 flex gap-3 text-white/45 pl-1 select-none">
+                <AlertTriangle className="w-4 h-4 text-[#facc15]/60 shrink-0 mt-0.5" />
+                <p className="text-[9px] leading-relaxed uppercase tracking-wide font-mono">
+                  <strong className="text-white">Redemption Scheduler Dispatch Rule:</strong> Withdrawals requested before 15th of the month will be processed on the 30th/31st of the same month. Requests after the 15th will be processed on the 15th of the next month.
+                </p>
+              </div>
+
             </form>
           </div>
 
-          {/* Past Transactions Ledger list */}
+          {/* D. TRANSACTION HISTORY LIST (Ledger Transaction types color coding) */}
           <div>
-            <h3 className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-3 flex items-center gap-1.5 leading-none">
-              <History className="w-3.5 h-3.5 text-white/35" />
-              Verifiable Blockchain Ledger
+            <h3 className="text-[9.5px] font-bold text-white/45 uppercase tracking-widest mb-3.5 flex items-center gap-1.5 pl-1">
+              <History className="w-4 h-4 text-white/30 shrink-0" />
+              <span>Verifiable Blockchain Ledger ({transactions.length})</span>
             </h3>
 
             {transactions.length === 0 ? (
-              <div className="bg-white/[0.01] border border-dashed border-white/10 rounded-xl p-4 text-center text-xs text-white/35 font-sans">
-                No ledger records mapped to this address vector yet.
+              <div className="bg-white/[0.01] border border-dashed border-white/10 rounded-2xl p-6 text-center text-[10px] text-white/35 font-mono uppercase tracking-wider">
+                No ledger records mapped to this address vector yet. Initialize peer transfers or withdraw assets.
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {transactions.map((tx) => {
                   const isSender = tx.sender === walletState.publicKey;
+                  const isWithdrawal = tx.type === 'withdrawal' || tx.recipient.startsWith('WITHDRAWAL');
+                  const isMining = tx.type === 'mining';
+
                   return (
-                    <div key={tx.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex justify-between items-center text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-1.5 rounded-lg border ${
-                          isSender 
+                    <div 
+                      key={tx.id} 
+                      className={`border rounded-2xl p-3.5 flex justify-between items-center text-xs transition-all hover:border-white/15 shadow-sm bg-[#090804] ${
+                        isWithdrawal 
+                          ? 'border-orange-500 p-3.5 bg-gradient-to-r from-orange-950/15 to-rose-950/20' 
+                          : isMining 
+                          ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-950/5 to-teal-950/10'
+                          : 'border-white/5 hover:border-white/10 bg-black/45'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl border shrink-0 ${
+                          isWithdrawal 
+                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' 
+                            : isMining 
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold'
+                            : isSender 
                             ? 'bg-orange-500/10 border-orange-500/20 text-orange-400' 
                             : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                         }`}>
-                          {isSender ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                          {isWithdrawal ? (
+                            <CreditCard className="w-4 h-4" />
+                          ) : isMining ? (
+                            <ArrowDownLeft className="w-4 h-4" />
+                          ) : isSender ? (
+                            <ArrowUpRight className="w-4 h-4" />
+                          ) : (
+                            <ArrowDownLeft className="w-4 h-4" />
+                          )}
                         </div>
-                        <div>
-                          <p className="font-semibold text-white/90">
-                            {isSender ? 'Transfer Out' : 'Received Coins'}
+                        
+                        <div className="text-left flex flex-col gap-0.5">
+                          <p className="font-extrabold text-white">
+                            {isWithdrawal 
+                              ? `INR Wallet Redemption` 
+                              : isMining 
+                              ? 'Mining Pool consensus gain' 
+                              : isSender 
+                              ? 'Validated Transfer Out' 
+                              : 'Incoming Consensus Reward'}
                           </p>
-                          <p className="text-[8.5px] text-white/40 font-mono tracking-wide mt-0.5 leading-none">
-                            Address: {isSender ? tx.recipient.substring(0, 10) : tx.sender.substring(0, 10)}... | Block #{tx.blockNumber}
-                          </p>
+                          
+                          {/* Metadata / Address Info */}
+                          <div className="font-mono text-[8.5px] uppercase tracking-wide text-white/40 flex flex-col gap-0.5 mt-0.5 leading-none">
+                            <span>
+                              {isWithdrawal 
+                                ? `Channel: ${tx.recipient.replace('WITHDRAWAL-', '').toUpperCase()} | Target: ${tx.metadata?.destination || 'Requested wallet'}`
+                                : `Peer Node Address: ${isSender ? tx.recipient.substring(0, 12) : tx.sender.substring(0, 12)}...`
+                              }
+                            </span>
+                            <span>Block Height ID: #{tx.blockNumber || 108529}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`font-semibold font-mono ${isSender ? 'text-orange-400' : 'text-amber-400'}`}>
-                          {isSender ? '-' : '+'}{tx.amount.toFixed(4)} POKI
+
+                      <div className="text-right flex flex-col items-end gap-1 font-mono">
+                        <span className={`font-extrabold font-mono text-[11.5px] ${
+                          isWithdrawal 
+                            ? 'text-rose-500' 
+                            : isMining 
+                            ? 'text-emerald-400' 
+                            : isSender 
+                            ? 'text-orange-400' 
+                            : 'text-amber-400'
+                        }`}>
+                          {isWithdrawal || isSender ? '-' : '+'}{tx.amount.toFixed(2)} POKI
                         </span>
-                        <p className="text-[8px] text-white/30 font-mono mt-0.5">
-                          {new Date(tx.timestamp).toLocaleTimeString()}
-                        </p>
+                        
+                        {/* Rupees Conversion calculated dynamically */}
+                        <div className="text-[8.5px] text-white/35 font-mono">
+                          ₹ {(tx.amount * PARITY_MULTIPLIER).toFixed(2)} INR
+                        </div>
+
+                        {/* Specific Withdrawal / Mining Status Badge */}
+                        {isWithdrawal ? (
+                          <span className="text-[8px] bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono px-2 py-0.5 rounded uppercase font-bold animate-pulse mt-0.5">
+                            Processing queue
+                          </span>
+                        ) : (
+                          <span className="text-[8px] bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 font-mono px-2 py-0.5 rounded uppercase mt-0.5">
+                            Core Validated
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for security checks
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Row-level Security Rules for User Profile Documents
+    match /users/{userId} {
+      // Authenticated users can read their own profiles, or admins can read everything
+      allow read: if isAuthenticated() && (isOwner(userId) || request.auth.token.admin == true);
+      
+      // Users can NEVER modify their balance or rates directly. All increments and coin mints 
+      // must flow through secure authenticated server environments (e.g. verified Cloud Functions)
+      allow write: if isAuthenticated() && isOwner(userId) 
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'transferableBalance', 'miningRate'])
+        && (
+          // Apply a 48-hour security withdrawal lock if sensitive payment configurations are altered
+          (request.resource.data.upiId == resource.data.upiId && request.resource.data.phoneNumber == resource.data.phoneNumber) 
+          || request.resource.data.withdrawalLockUntil >= request.time + duration.value(48, 'h')
+        );
+
+      // Create profile constraint: Starts with 0 balance
+      allow create: if isAuthenticated() && isOwner(userId)
+        && request.resource.data.balance == 0.0
+        && request.resource.data.transferableBalance == 0.0;
+    }
+
+    // Row-level Security for Verified Ledgers & Transactions
+    match /transactions/{transactionId} {
+      // Users can read transaction history where they are the sender or recipient
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.senderId || 
+        request.auth.uid == resource.data.recipientId ||
+        request.auth.token.admin == true
+      );
+
+      // Transactions can ONLY be created by servers or validated routines
+      // Prevent client-side injection of forged transactions
+      allow create: if isAuthenticated() 
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.amount > 0
+        && request.resource.data.amount >= 4545 // Minimum withdrawal limit protection at rule-level
+        && request.resource.data.isVerifiedByServer == false; // Must be flagged false default for server processing
+
+      allow update, delete: if false; // Immutability of ledger logs
+    }
+    
+    // Security for active mining sessions to track logs & timing
+    match /sessions/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+  }
+}

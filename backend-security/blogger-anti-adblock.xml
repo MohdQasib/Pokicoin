@@ -1,0 +1,179 @@
+<!-- 
+  POKICOIN SECURE ANTI-ADBLOCK & PRIVATE DNS DETECTION SUITE (MONETAG OPTIMIZED)
+  Installation: Paste this clean code snippet directly before the </body> tag in your Blogger XML Template.
+-->
+
+<style type="text/css">
+  /* Non-dismissible Popup Styling with high contrast styling */
+  #anti-adblock-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(9, 8, 4, 0.94);
+    z-index: 2147483647; /* Highest possible layer depth */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #ffffff;
+    user-select: none;
+  }
+  .anti-adblock-card {
+    background: #0d0b06;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: 24px;
+    padding: 32px;
+    max-width: 440px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+  .anti-adblock-icon {
+    font-size: 40px;
+    color: #f59e0b;
+    margin-bottom: 20px;
+    display: inline-block;
+    animation: pulseAd 2s infinite ease-in-out;
+  }
+  .anti-adblock-title {
+    font-size: 18px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    color: #f59e0b;
+  }
+  .anti-adblock-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 24px;
+  }
+  .anti-adblock-btn {
+    background: linear-gradient(135deg, #f59e0b 0%, #e0ab11 100%);
+    color: #090804;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+  }
+  .anti-adblock-btn:hover {
+    transform: scale(1.03);
+    background: #f59e0b;
+  }
+  /* Lock page interaction backdoors */
+  body.adblock-active {
+    overflow: hidden !important;
+    max-height: 100vh !important;
+  }
+  @keyframes pulseAd {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+  }
+</style>
+
+<!-- Blur filter wrapper to cover underlying content once triggered -->
+<div id="anti-adblock-overlay" style="display: none;">
+  <div class="anti-adblock-card">
+    <div class="anti-adblock-icon">⚠️</div>
+    <div class="anti-adblock-title">AdBlock Protected</div>
+    <div class="anti-adblock-text">
+        AdBlocker or Private DNS Detected! Please disable your ad blocker or reset your custom DNS settings and refresh the page to continue using Pokicoin.
+    </div>
+    <button class="anti-adblock-btn" onclick="window.location.reload();">I have disabled it, Refresh</button>
+  </div>
+</div>
+
+<script type="text/javascript">
+  (function() {
+    'use strict';
+
+    // Monetag Domain Check Candidates (Checks standard Monetag server endpoints)
+    const MONETAG_DOMAINS = [
+      'https://servomany.com/asrc?id=1',
+      'https://native.propellerclick.com',
+      'https://proparm.com'
+    ];
+
+    function triggerLock() {
+      // Un-hide the popup
+      const overlay = document.getElementById('anti-adblock-overlay');
+      if (overlay) {
+        overlay.style.display = 'flex';
+        document.body.classList.add('adblock-active');
+        
+        // Blur underlying container view if present (Standard Blogger templates use id 'header-wrapper', 'main-wrapper', 'outer-wrapper')
+        const wrappers = ['header-wrapper', 'main-wrapper', 'outer-wrapper', 'content-wrapper', 'body-layout', 'app-root'];
+        wrappers.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) {
+            el.style.filter = 'blur(15px)';
+            el.style.pointerEvents = 'none';
+          }
+        });
+      }
+    }
+
+    // --- LAYER 1: DOM CHECK (Browser Extensions) ---
+    function runDomCheck() {
+      // Create a dummy fake advertisement bait element with common class names/triggers
+      const adBait = document.createElement('div');
+      adBait.innerHTML = '&nbsp;';
+      adBait.className = 'adsbox ads-box doubleclick-ad ad-placement monetization-ad sponsored-banner';
+      adBait.setAttribute('style', 'position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px;');
+      document.body.appendChild(adBait);
+
+      window.setTimeout(function() {
+        // If the element is hidden (height/offset zero or display none), AdBlock has blocked it
+        if (adBait.offsetHeight === 0 || adBait.clientWidth === 0 || window.getComputedStyle(adBait).display === 'none') {
+          triggerLock();
+        }
+        document.body.removeChild(adBait);
+      }, 150);
+    }
+
+    // --- LAYER 2: DNS CHECK (AdGuard / Private DNS Filters) ---
+    function runDnsCheck() {
+      // Pick a random primary Monetag endpoint to perform background DNS verification
+      const testUrl = MONETAG_DOMAINS[Math.floor(Math.random() * MONETAG_DOMAINS.length)];
+      
+      // Execute a silent, low-footprint fetch request of the ad domain
+      fetch(testUrl, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        credentials: 'omit'
+      })
+      .then(function() {
+        // Connected successfully! Ad server is reachable.
+      })
+      .catch(function(err) {
+        // If a network connection error was triggered (AdGuard/DNS blocked standard requests), lock the site
+        console.warn('DNS adblock resolution restriction active:', err);
+        triggerLock();
+      });
+    }
+
+    // Run dual-layer security scan as soon as document is ready
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      runDomCheck();
+      runDnsCheck();
+    } else {
+      document.addEventListener('DOMContentLoaded', function() {
+        runDomCheck();
+        runDnsCheck();
+      });
+    }
+  })();
+</script>

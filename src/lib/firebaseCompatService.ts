@@ -300,7 +300,7 @@ export async function provisionRealtimeProfileNode(user: firebase.User): Promise
       fullName: generatedName,
       phone: cleanPhone,
       email: user.email || `${cleanPhone || user.uid}@pokicoin-rtdb.in`,
-      balance: 10.0, // Welcome gift seed coin
+      balance: 0.0, // New user starts with exactly 0.0 Poki coins
       transferableBalance: 0.0,
       isMining: false,
       signupTimestamp: new Date().toISOString(),
